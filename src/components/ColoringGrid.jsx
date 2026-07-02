@@ -3,12 +3,12 @@ import { formatShortWon } from '../utils/format'
 
 const UNIT = 10000
 const COLUMNS = 10
-const PASTEL_COLORS = [
-  'rgba(255, 190, 130, 0.68)',
-  'rgba(255, 226, 110, 0.68)',
-  'rgba(150, 210, 155, 0.68)',
-  'rgba(120, 190, 235, 0.68)',
-  'rgba(210, 160, 225, 0.68)',
+const PALETTE = [
+  { bg: 'rgba(255, 190, 130, 0.68)', text: '#8a4a12' },
+  { bg: 'rgba(255, 226, 110, 0.68)', text: '#7a6300' },
+  { bg: 'rgba(150, 210, 155, 0.68)', text: '#1f5c2a' },
+  { bg: 'rgba(120, 190, 235, 0.68)', text: '#0b4a73' },
+  { bg: 'rgba(210, 160, 225, 0.68)', text: '#5c1f70' },
 ]
 
 // Decompose a contiguous cell-index range into the fewest axis-aligned
@@ -43,7 +43,7 @@ function decomposeRange(startIndex, endIndex, columns) {
 
 export default function ColoringGrid({ transactions, overallLimit, spent }) {
   const totalCells = useMemo(() => {
-    const limit = overallLimit > 0 ? overallLimit : Math.max(Math.ceil((spent * 1.5) / UNIT) * UNIT, UNIT * 10)
+    const limit = overallLimit > 0 ? overallLimit : Math.max(Math.ceil((spent * 1.2) / UNIT) * UNIT, UNIT * 10)
     return Math.max(Math.ceil(limit / UNIT), 1)
   }, [overallLimit, spent])
 
@@ -54,8 +54,14 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
       .sort((a, b) => (a.date === b.date ? a.created_at?.localeCompare(b.created_at) : a.date < b.date ? -1 : 1))
       .map((t, i) => {
         const categoryName = t.categories?.name || '기타'
-        const label = t.memo ? `${categoryName}(${t.memo})` : categoryName
-        return { id: t.id, label, amount: Number(t.amount), color: PASTEL_COLORS[i % PASTEL_COLORS.length] }
+        let label
+        if (categoryName === '기타') {
+          label = t.memo || categoryName
+        } else {
+          label = t.memo ? `${categoryName}(${t.memo})` : categoryName
+        }
+        const palette = PALETTE[i % PALETTE.length]
+        return { id: t.id, label, amount: Number(t.amount), color: palette.bg, textColor: palette.text }
       })
 
     let cumulative = 0
@@ -84,6 +90,7 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
           length: b.length,
           rowSpan: b.rowSpan,
           color: item.color,
+          textColor: item.textColor,
           label: i === labelBlockIndex ? `${item.label} ${formatShortWon(item.amount)}` : null,
         })
       })
@@ -115,7 +122,11 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
               background: b.color,
             }}
           >
-            {b.label && <span className="coloring-run-label">{b.label}</span>}
+            {b.label && (
+              <span className="coloring-run-label" style={{ color: b.textColor }}>
+                {b.label}
+              </span>
+            )}
           </div>
         ))}
       </div>
