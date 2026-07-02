@@ -14,12 +14,16 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
   const cells = useMemo(() => {
     const items = [...transactions]
       .sort((a, b) => (a.date === b.date ? a.created_at?.localeCompare(b.created_at) : a.date < b.date ? -1 : 1))
-      .map((t, i) => ({
-        id: t.id,
-        label: t.categories?.name || t.memo || '기타',
-        amount: Number(t.amount),
-        color: PASTEL_COLORS[i % PASTEL_COLORS.length],
-      }))
+      .map((t, i) => {
+        const categoryName = t.categories?.name || '기타'
+        const label = t.memo ? `${categoryName}(${t.memo})` : categoryName
+        return {
+          id: t.id,
+          label,
+          amount: Number(t.amount),
+          color: PASTEL_COLORS[i % PASTEL_COLORS.length],
+        }
+      })
 
     let cumulative = 0
     const boundaries = items.map((it) => {
@@ -49,9 +53,7 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
         <div key={i} className="coloring-cell" style={cell.owner ? { background: cell.owner.color } : undefined}>
           {cell.isFirst && (
             <span className="coloring-cell-label">
-              {cell.owner.label}
-              <br />
-              {formatShortWon(cell.owner.amount)}
+              {cell.owner.label} {formatShortWon(cell.owner.amount)}
             </span>
           )}
         </div>
