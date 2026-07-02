@@ -39,7 +39,10 @@ export default function Login() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div className="auth-title">💰 우리집 가계부</div>
+        <div className="auth-title">
+          <img src="./favicon.svg" alt="" className="brand-icon-lg" />
+          우리집 가계부
+        </div>
         <div className="auth-subtitle">가족과 함께 쓰는 가계부</div>
 
         <div className="auth-tabs">

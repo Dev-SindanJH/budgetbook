@@ -43,7 +43,6 @@ create table if not exists public.transactions (
   amount numeric not null check (amount >= 0),
   category_id uuid references public.categories(id) on delete set null,
   payment_method text,
-  due_date date, -- 카드 결제일 (신용/체크카드 결제 시 실제 청구되는 날짜)
   memo text,
   created_at timestamptz not null default now()
 );
@@ -196,7 +195,7 @@ create policy "budgets_all_family" on public.budgets
 alter publication supabase_realtime add table public.transactions;
 
 -- ------------------------------------------------------------
--- 마이그레이션: 기존 DB에 이미 transactions 테이블이 있다면 아래 한 줄만 실행하면 됩니다
--- (신규 프로젝트에서 이 파일을 처음부터 실행하는 경우엔 위 CREATE TABLE에 이미 포함되어 있어 불필요)
+-- 마이그레이션: due_date 컬럼을 추가했었다면 더 이상 쓰지 않으므로 제거합니다
+-- (카드 결제일은 거래의 date 컬럼을 그대로 사용하는 것으로 단순화했습니다)
 -- ------------------------------------------------------------
-alter table public.transactions add column if not exists due_date date;
+alter table public.transactions drop column if exists due_date;

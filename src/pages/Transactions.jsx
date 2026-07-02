@@ -141,10 +141,7 @@ export default function Transactions() {
                   <div className="tx-info">
                     <div className="tx-category">{t.categories?.name || '미분류'}</div>
                     <div className="tx-memo">{t.memo || t.payment_method}</div>
-                    <div className="tx-meta">
-                      {t.profiles?.name}
-                      {t.due_date && <span className="badge" style={{ marginLeft: 6 }}>💳 {t.due_date} 결제</span>}
-                    </div>
+                    <div className="tx-meta">{t.profiles?.name}</div>
                   </div>
                 </div>
                 <div className="tx-row-right" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

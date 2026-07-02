@@ -18,7 +18,8 @@ export default function Layout() {
     <div className="app-shell">
       <header className="topnav">
         <div className="topnav-brand">
-          💰 우리집 가계부
+          <img src="./favicon.svg" alt="" className="brand-icon" />
+          우리집 가계부
           {family && <span className="topnav-family">{family.name}</span>}
         </div>
         <nav className="topnav-links desktop-only">

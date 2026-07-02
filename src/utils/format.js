@@ -34,3 +34,12 @@ export function monthRange(monthKey) {
   const to = `${monthKey}-${String(lastDay).padStart(2, '0')}`
   return { from, to }
 }
+
+export function formatShortWon(amount) {
+  const n = Number(amount) || 0
+  if (n >= 10000) {
+    const man = Math.round((n / 10000) * 10) / 10
+    return `${man}만`
+  }
+  return n.toLocaleString('ko-KR')
+}

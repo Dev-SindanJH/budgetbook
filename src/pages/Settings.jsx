@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../hooks/useCategories'
 import { useProfiles } from '../hooks/useProfiles'
 import { addCategory, updateCategory, deleteCategory, updateOwnProfile, fetchAllFamilyData, importTransactions, resetFamilyData } from '../lib/api'
+import { DASHBOARD_PANELS, getDashboardPrefs, setDashboardPrefs } from '../lib/dashboardPrefs'
 
 const COLOR_PRESETS = ['#f97316', '#3b82f6', '#8b5cf6', '#06b6d4', '#ef4444', '#ec4899', '#22c55e', '#eab308', '#64748b', '#94a3b8', '#16a34a', '#0ea5e9']
 
@@ -23,6 +24,14 @@ export default function Settings() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const fileInputRef = useRef(null)
+
+  const [dashboardPrefs, setDashboardPrefsState] = useState(getDashboardPrefs())
+
+  function togglePanel(key) {
+    const next = { ...dashboardPrefs, [key]: !dashboardPrefs[key] }
+    setDashboardPrefsState(next)
+    setDashboardPrefs(next)
+  }
 
   async function handleAddCategory(e) {
     e.preventDefault()
@@ -120,6 +129,19 @@ export default function Settings() {
           <span>초대 코드</span>
           <strong className="badge">{family?.invite_code}</strong>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="section-title">대시보드 구성</div>
+        <div className="hint-text" style={{ marginBottom: 12 }}>홈 화면에 보여줄 패널을 선택하세요</div>
+        {DASHBOARD_PANELS.map((p) => (
+          <div className="settings-list-item" key={p.key}>
+            <span>{p.label}</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={dashboardPrefs[p.key]} onChange={() => togglePanel(p.key)} />
+            </label>
+          </div>
+        ))}
       </div>
 
       <div className="card">
