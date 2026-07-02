@@ -1,17 +1,17 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTransactions } from '../hooks/useTransactions'
 import { useBudgets } from '../hooks/useBudgets'
 import { useProfiles } from '../hooks/useProfiles'
 import { useCardDue } from '../hooks/useCardDue'
-import { formatWon, monthStr, monthRange, monthLabel } from '../utils/format'
+import { formatWon, monthStr, monthRange, monthLabel, addMonths } from '../utils/format'
 import BudgetProgressBar from '../components/BudgetProgressBar'
 import CategoryDonutChart from '../components/CategoryDonutChart'
 
 export default function Dashboard() {
   const { profile, family } = useAuth()
-  const month = monthStr()
+  const [month, setMonth] = useState(monthStr())
   const { from, to } = monthRange(month)
   const { transactions, loading } = useTransactions(family?.id, { from, to })
   const { budgets } = useBudgets(family?.id, month)
@@ -73,7 +73,16 @@ export default function Dashboard() {
     <div>
       <div className="page-header">
         <h1 className="page-title">안녕하세요, {profile?.name}님 👋</h1>
-        <span className="hint-text">{monthLabel(month)}</span>
+      </div>
+
+      <div className="month-nav">
+        <button className="btn btn-ghost btn-sm" onClick={() => setMonth(addMonths(month, -1))} aria-label="이전 달">
+          ◀
+        </button>
+        <span className="month-nav-label">{monthLabel(month)}</span>
+        <button className="btn btn-ghost btn-sm" onClick={() => setMonth(addMonths(month, 1))} aria-label="다음 달">
+          ▶
+        </button>
       </div>
 
       <div className="grid grid-3">
@@ -92,7 +101,7 @@ export default function Dashboard() {
       </div>
 
       <div className="card">
-        <div className="section-title">이번 달 전체 예산</div>
+        <div className="section-title">전체 예산</div>
         {effectiveLimit > 0 ? (
           <BudgetProgressBar spent={stats.expense} limit={effectiveLimit} label="전체 지출" />
         ) : (
@@ -105,12 +114,12 @@ export default function Dashboard() {
       <div className="card">
         <div className="page-header" style={{ marginBottom: 8 }}>
           <div className="section-title" style={{ marginBottom: 0 }}>
-            💳 이번 달 카드 결제 예정
+            💳 카드 결제 예정
           </div>
           {cardDueTotal > 0 && <span className="hint-text">총 {formatWon(cardDueTotal)}</span>}
         </div>
         {cardDueGroups.length === 0 ? (
-          <div className="empty-state">이번 달 결제 예정인 카드값이 없어요</div>
+          <div className="empty-state">이 달에 결제 예정인 카드값이 없어요</div>
         ) : (
           cardDueGroups.map((g) => (
             <div key={g.date} style={{ marginBottom: 10 }}>

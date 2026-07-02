@@ -122,6 +122,21 @@ a {
   margin: 0;
 }
 
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.month-nav-label {
+  font-size: 28px;
+  font-weight: 800;
+  min-width: 140px;
+  text-align: center;
+}
+
 /* ---------- Card ---------- */
 
 .card {
