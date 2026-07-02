@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
 export default function FamilySetup() {
   const { refreshProfile, signOut } = useAuth()
+  const navigate = useNavigate()
   const [mode, setMode] = useState('create') // 'create' | 'join'
   const [familyName, setFamilyName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
@@ -37,6 +39,12 @@ export default function FamilySetup() {
       return
     }
     await refreshProfile()
+    navigate('/', { replace: true })
+  }
+
+  async function handleStart() {
+    await refreshProfile()
+    navigate('/', { replace: true })
   }
 
   if (createdCode) {
@@ -49,7 +57,7 @@ export default function FamilySetup() {
             <div className="hint-text">초대 코드</div>
             <div className="invite-code-value">{createdCode}</div>
           </div>
-          <button className="btn btn-primary btn-block" onClick={refreshProfile}>
+          <button className="btn btn-primary btn-block" onClick={handleStart}>
             시작하기
           </button>
         </div>
