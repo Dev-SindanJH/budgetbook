@@ -801,9 +801,30 @@ a {
 }
 
 .coloring-cell {
+  position: relative;
   aspect-ratio: 1;
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--border);
+  overflow: visible;
+}
+
+.coloring-cell-label {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 9px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #4a3a20;
+  white-space: nowrap;
+  z-index: 1;
+  pointer-events: none;
+}
+
+@media (max-width: 480px) {
+  .coloring-cell-label {
+    font-size: 7px;
+  }
 }
 
 @media (max-width: 480px) {

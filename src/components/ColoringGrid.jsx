@@ -1,57 +1,61 @@
 import { useMemo } from 'react'
-import { formatWon } from '../utils/format'
+import { formatShortWon } from '../utils/format'
 
 const UNIT = 10000
-const COLUMNS = 20
+const COLUMNS = 10
+const PASTEL_COLORS = ['#FFD9B3', '#FFF3B0', '#C8E6C9', '#B3E5FC', '#E1BEE7']
 
-export default function ColoringGrid({ categoryTotals, overallLimit, spent }) {
+export default function ColoringGrid({ transactions, overallLimit, spent }) {
   const totalCells = useMemo(() => {
     const limit = overallLimit > 0 ? overallLimit : Math.max(Math.ceil((spent * 1.5) / UNIT) * UNIT, UNIT * 10)
     return Math.max(Math.ceil(limit / UNIT), 1)
   }, [overallLimit, spent])
 
   const cells = useMemo(() => {
+    const items = [...transactions]
+      .sort((a, b) => (a.date === b.date ? a.created_at?.localeCompare(b.created_at) : a.date < b.date ? -1 : 1))
+      .map((t, i) => ({
+        id: t.id,
+        label: t.categories?.name || t.memo || '기타',
+        amount: Number(t.amount),
+        color: PASTEL_COLORS[i % PASTEL_COLORS.length],
+      }))
+
     let cumulative = 0
-    const boundaries = categoryTotals.map((c) => {
-      cumulative += c.amount
-      return { color: c.color, upTo: cumulative }
+    const boundaries = items.map((it) => {
+      cumulative += it.amount
+      return { ...it, upTo: cumulative }
     })
+    const totalSpentAmount = cumulative
+
     const list = []
+    let lastOwnerId = null
     for (let i = 0; i < totalCells; i++) {
       const cellStart = i * UNIT
-      let color = null
-      if (cellStart < cumulative) {
-        const b = boundaries.find((b) => b.upTo > cellStart)
-        color = b?.color || null
+      let owner = null
+      if (cellStart < totalSpentAmount) {
+        owner = boundaries.find((b) => b.upTo > cellStart) || null
       }
-      list.push(color)
+      const isFirst = !!owner && owner.id !== lastOwnerId
+      lastOwnerId = owner ? owner.id : lastOwnerId
+      list.push({ owner, isFirst })
     }
     return list
-  }, [categoryTotals, totalCells])
-
-  const filledCells = Math.min(Math.ceil(spent / UNIT), totalCells)
+  }, [transactions, totalCells])
 
   return (
-    <div>
-      <div className="coloring-grid" style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)` }}>
-        {cells.map((color, i) => (
-          <div key={i} className="coloring-cell" style={color ? { background: color } : undefined} />
-        ))}
-      </div>
-      <div className="hint-text" style={{ marginTop: 8 }}>
-        칸 1개 = 1만원 · 총 {totalCells}칸 중 {filledCells}칸 색칠됨
-      </div>
-      {categoryTotals.length > 0 && (
-        <div className="legend-list" style={{ marginTop: 10 }}>
-          {categoryTotals.map((c) => (
-            <div className="legend-row" key={c.name}>
-              <span className="legend-dot" style={{ background: c.color }} />
-              <span className="legend-name">{c.name}</span>
-              <span className="legend-amount">{formatWon(c.amount)}</span>
-            </div>
-          ))}
+    <div className="coloring-grid" style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)` }}>
+      {cells.map((cell, i) => (
+        <div key={i} className="coloring-cell" style={cell.owner ? { background: cell.owner.color } : undefined}>
+          {cell.isFirst && (
+            <span className="coloring-cell-label">
+              {cell.owner.label}
+              <br />
+              {formatShortWon(cell.owner.amount)}
+            </span>
+          )}
         </div>
-      )}
+      ))}
     </div>
   )
 }

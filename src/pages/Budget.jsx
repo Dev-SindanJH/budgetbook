@@ -37,12 +37,7 @@ export default function Budget() {
   const overallBudget = budgets.find((b) => !b.category_id)
   const categoryBudget = (categoryId) => budgets.find((b) => b.category_id === categoryId)
 
-  const categoryTotals = useMemo(() => {
-    return expenseCategories
-      .map((c) => ({ name: c.name, color: c.color, amount: spentByCategory.map[c.id] || 0 }))
-      .filter((c) => c.amount > 0)
-      .sort((a, b) => b.amount - a.amount)
-  }, [expenseCategories, spentByCategory])
+  const expenseTransactions = useMemo(() => transactions.filter((t) => t.type === 'expense'), [transactions])
 
   function draftValue(key, fallback) {
     return drafts[key] !== undefined ? drafts[key] : fallback ?? ''
@@ -124,7 +119,7 @@ export default function Budget() {
       <div className="card">
         <div className="section-title">🎨 색칠 가계부</div>
         <ColoringGrid
-          categoryTotals={categoryTotals}
+          transactions={expenseTransactions}
           overallLimit={overallBudget ? Number(overallBudget.limit_amount) : 0}
           spent={spentByCategory.total}
         />

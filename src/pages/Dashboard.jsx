@@ -46,10 +46,7 @@ export default function Dashboard() {
     return Object.values(byCategory).sort((a, b) => b.value - a.value)
   }, [transactions])
 
-  const categoryTotals = useMemo(
-    () => donutData.map((d) => ({ name: d.name, color: d.color, amount: d.value })),
-    [donutData],
-  )
+  const expenseTransactions = useMemo(() => transactions.filter((t) => t.type === 'expense'), [transactions])
 
   const memberSummary = useMemo(() => {
     const byMember = {}
@@ -125,7 +122,7 @@ export default function Dashboard() {
       {prefs.coloringGrid && (
         <div className="card">
           <div className="section-title">🎨 색칠 가계부</div>
-          <ColoringGrid categoryTotals={categoryTotals} overallLimit={effectiveLimit} spent={stats.expense} />
+          <ColoringGrid transactions={expenseTransactions} overallLimit={effectiveLimit} spent={stats.expense} />
         </div>
       )}
 
