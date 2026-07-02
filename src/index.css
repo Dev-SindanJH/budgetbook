@@ -797,7 +797,6 @@ a {
 
 .coloring-grid-wrap {
   position: relative;
-  --coloring-cell-h: 74px;
 }
 
 .coloring-base-grid {
@@ -841,10 +840,6 @@ a {
 }
 
 @media (max-width: 480px) {
-  .coloring-grid-wrap {
-    --coloring-cell-h: 58px;
-  }
-
   .coloring-run-label {
     font-size: 12px;
   }

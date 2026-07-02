@@ -1,8 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatShortWon } from '../utils/format'
 
 const UNIT = 10000
 const COLUMNS = 10
+const GAP = 3
+const MAX_CELL_HEIGHT = 74
+const MIN_CELL_HEIGHT = 24
 const PALETTE = [
   { bg: 'rgba(255, 190, 130, 0.68)', text: '#8a4a12' },
   { bg: 'rgba(255, 226, 110, 0.68)', text: '#7a6300' },
@@ -42,6 +45,26 @@ function decomposeRange(startIndex, endIndex, columns) {
 }
 
 export default function ColoringGrid({ transactions, overallLimit, spent }) {
+  const wrapRef = useRef(null)
+  const [cellHeight, setCellHeight] = useState(MAX_CELL_HEIGHT)
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return undefined
+    const compute = () => {
+      const colWidth = (el.clientWidth - GAP * (COLUMNS - 1)) / COLUMNS
+      setCellHeight(Math.max(MIN_CELL_HEIGHT, Math.min(MAX_CELL_HEIGHT, colWidth)))
+    }
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    window.addEventListener('resize', compute)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', compute)
+    }
+  }, [])
+
   const totalCells = useMemo(() => {
     const limit = overallLimit > 0 ? overallLimit : Math.max(Math.ceil((spent * 1.2) / UNIT) * UNIT, UNIT * 10)
     return Math.max(Math.ceil(limit / UNIT), 1)
@@ -98,11 +121,13 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
     return result
   }, [transactions, totalCells])
 
+  const rowTemplate = `repeat(${totalRows}, ${cellHeight}px)`
+
   return (
-    <div className="coloring-grid-wrap">
+    <div className="coloring-grid-wrap" ref={wrapRef}>
       <div
         className="coloring-base-grid"
-        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: `repeat(${totalRows}, var(--coloring-cell-h))` }}
+        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: rowTemplate }}
       >
         {Array.from({ length: totalCells }).map((_, i) => (
           <div key={i} className="coloring-base-cell" />
@@ -110,7 +135,7 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
       </div>
       <div
         className="coloring-overlay-grid"
-        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: `repeat(${totalRows}, var(--coloring-cell-h))` }}
+        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: rowTemplate }}
       >
         {itemBlocks.map((b) => (
           <div
