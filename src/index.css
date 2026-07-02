@@ -168,6 +168,12 @@ a {
   margin-top: 0;
 }
 
+.card + .grid,
+.grid + .card,
+.grid + .grid {
+  margin-top: 16px;
+}
+
 .grid {
   display: grid;
   gap: 16px;
