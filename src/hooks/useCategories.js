@@ -14,7 +14,16 @@ export function useCategories(familyId) {
       .eq('family_id', familyId)
       .order('type')
       .order('name')
-    if (!error) setCategories(data || [])
+    if (!error) {
+      const sorted = [...(data || [])].sort((a, b) => {
+        if (a.type !== b.type) return a.type < b.type ? -1 : 1
+        const aEtc = a.name.startsWith('기타')
+        const bEtc = b.name.startsWith('기타')
+        if (aEtc !== bEtc) return aEtc ? -1 : 1
+        return a.name.localeCompare(b.name, 'ko')
+      })
+      setCategories(sorted)
+    }
     setLoading(false)
   }, [familyId])
 
