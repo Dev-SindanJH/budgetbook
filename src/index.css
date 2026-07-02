@@ -164,6 +164,10 @@ a {
   margin-top: 16px;
 }
 
+.grid > .card + .card {
+  margin-top: 0;
+}
+
 .grid {
   display: grid;
   gap: 16px;
