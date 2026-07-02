@@ -110,12 +110,84 @@ a {
   gap: 12px;
 }
 
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.menu-toggle:hover {
+  background: var(--border);
+}
+
+.mobile-menu {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px 16px;
+  background: var(--surface-solid);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 60px;
+  z-index: 19;
+}
+
+.mobile-menu .topnav-link {
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.mobile-menu-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 .page {
   flex: 1;
   width: 100%;
   max-width: 980px;
   margin: 0 auto;
   padding: 24px 20px 80px;
+}
+
+@media (max-width: 720px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-menu {
+    display: flex;
+  }
+
+  .topnav-brand {
+    font-size: 15px;
+  }
+
+  .page {
+    padding: 16px 14px 72px;
+  }
+
+  .month-nav-label {
+    font-size: 22px;
+    min-width: 110px;
+  }
 }
 
 .page-header {
@@ -404,6 +476,23 @@ a {
   align-items: center;
   gap: 12px;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.tx-row-right {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .tx-row {
+    flex-wrap: wrap;
+  }
+
+  .tx-row-right {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
 }
 
 .tx-icon {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const { family, profile, signOut } = useAuth()
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <div className="app-shell">
@@ -19,7 +21,7 @@ export default function Layout() {
           💰 우리집 가계부
           {family && <span className="topnav-family">{family.name}</span>}
         </div>
-        <nav className="topnav-links">
+        <nav className="topnav-links desktop-only">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
@@ -31,13 +33,50 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="topnav-right">
+        <div className="topnav-right desktop-only">
           <span className="hint-text">{profile?.name}</span>
           <button className="btn btn-ghost btn-sm" onClick={signOut}>
             로그아웃
           </button>
         </div>
+        <button
+          className="menu-toggle"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label="메뉴 열기"
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? '✕' : '☰'}
+        </button>
       </header>
+
+      {menuOpen && (
+        <nav className="mobile-menu">
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              onClick={() => setMenuOpen(false)}
+              className={({ isActive }) => 'topnav-link' + (isActive ? ' active' : '')}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+          <div className="mobile-menu-footer">
+            <span className="hint-text">{profile?.name}</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setMenuOpen(false)
+                signOut()
+              }}
+            >
+              로그아웃
+            </button>
+          </div>
+        </nav>
+      )}
+
       <main className="page">
         <Outlet />
       </main>

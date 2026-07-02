@@ -96,6 +96,7 @@ export default function Budget() {
             type="number"
             min="0"
             placeholder="전체 예산 금액"
+            style={{ flex: 1, minWidth: 0, border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}
             value={draftValue('overall', overallBudget?.limit_amount)}
             onChange={(e) => setDrafts((d) => ({ ...d, overall: e.target.value }))}
           />
@@ -120,16 +121,16 @@ export default function Budget() {
           const key = c.id
           return (
             <div key={c.id} style={{ marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontWeight: 600 }}>
                   {c.icon} {c.name}
                 </span>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flex: '1 1 200px', maxWidth: 260 }}>
                   <input
                     type="number"
                     min="0"
                     placeholder="예산 금액"
-                    style={{ width: 140, border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}
+                    style={{ flex: 1, minWidth: 0, border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}
                     value={draftValue(key, b?.limit_amount)}
                     onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
                   />

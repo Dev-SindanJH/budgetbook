@@ -147,7 +147,7 @@ export default function Transactions() {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="tx-row-right" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div className={'tx-amount ' + t.type}>
                     {t.type === 'income' ? '+' : '-'}
                     {formatWon(t.amount)}
