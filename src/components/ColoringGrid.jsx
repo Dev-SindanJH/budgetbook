@@ -3,12 +3,42 @@ import { formatShortWon } from '../utils/format'
 
 const UNIT = 10000
 const COLUMNS = 10
-const PASTEL_COLORS = ['#FFD9B3', '#FFF3B0', '#C8E6C9', '#B3E5FC', '#E1BEE7']
+const PASTEL_COLORS = [
+  'rgba(255, 190, 130, 0.68)',
+  'rgba(255, 226, 110, 0.68)',
+  'rgba(150, 210, 155, 0.68)',
+  'rgba(120, 190, 235, 0.68)',
+  'rgba(210, 160, 225, 0.68)',
+]
 
-function sameOwner(a, b) {
-  if (!a && !b) return true
-  if (!a || !b) return false
-  return a.id === b.id
+// Decompose a contiguous cell-index range into the fewest axis-aligned
+// rectangles on a fixed-width grid (partial first row, merged full rows, partial last row).
+function decomposeRange(startIndex, endIndex, columns) {
+  if (startIndex >= endIndex) return []
+  const startRow = Math.floor(startIndex / columns)
+  const startCol = startIndex % columns
+  const lastIndex = endIndex - 1
+  const endRow = Math.floor(lastIndex / columns)
+  const endCol = lastIndex % columns
+
+  if (startRow === endRow) {
+    return [{ row: startRow, startCol, length: endCol - startCol + 1, rowSpan: 1 }]
+  }
+
+  const blocks = []
+  const fullRowsStart = startCol === 0 ? startRow : startRow + 1
+  const fullRowsEnd = endCol === columns - 1 ? endRow : endRow - 1
+
+  if (startCol !== 0) {
+    blocks.push({ row: startRow, startCol, length: columns - startCol, rowSpan: 1 })
+  }
+  if (fullRowsStart <= fullRowsEnd) {
+    blocks.push({ row: fullRowsStart, startCol: 0, length: columns, rowSpan: fullRowsEnd - fullRowsStart + 1 })
+  }
+  if (endCol !== columns - 1) {
+    blocks.push({ row: endRow, startCol: 0, length: endCol + 1, rowSpan: 1 })
+  }
+  return blocks
 }
 
 export default function ColoringGrid({ transactions, overallLimit, spent }) {
@@ -17,74 +47,78 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
     return Math.max(Math.ceil(limit / UNIT), 1)
   }, [overallLimit, spent])
 
-  const rows = useMemo(() => {
+  const totalRows = Math.ceil(totalCells / COLUMNS)
+
+  const itemBlocks = useMemo(() => {
     const items = [...transactions]
       .sort((a, b) => (a.date === b.date ? a.created_at?.localeCompare(b.created_at) : a.date < b.date ? -1 : 1))
       .map((t, i) => {
         const categoryName = t.categories?.name || '기타'
         const label = t.memo ? `${categoryName}(${t.memo})` : categoryName
-        return {
-          id: t.id,
-          label,
-          amount: Number(t.amount),
-          color: PASTEL_COLORS[i % PASTEL_COLORS.length],
-        }
+        return { id: t.id, label, amount: Number(t.amount), color: PASTEL_COLORS[i % PASTEL_COLORS.length] }
       })
 
     let cumulative = 0
-    const boundaries = items.map((it) => {
-      cumulative += it.amount
-      return { ...it, upTo: cumulative }
-    })
-    const totalSpentAmount = cumulative
-
-    const owners = []
-    for (let i = 0; i < totalCells; i++) {
-      const cellStart = i * UNIT
-      let owner = null
-      if (cellStart < totalSpentAmount) {
-        owner = boundaries.find((b) => b.upTo > cellStart) || null
-      }
-      owners.push(owner)
+    const result = []
+    for (const item of items) {
+      const prevUpTo = cumulative
+      cumulative += item.amount
+      const startIndex = Math.min(Math.ceil(prevUpTo / UNIT), totalCells)
+      const endIndex = Math.min(Math.ceil(cumulative / UNIT), totalCells)
+      const blocks = decomposeRange(startIndex, endIndex, COLUMNS)
+      if (blocks.length === 0) continue
+      let labelBlockIndex = 0
+      let bestArea = -1
+      blocks.forEach((b, i) => {
+        const area = b.length * b.rowSpan
+        if (area > bestArea) {
+          bestArea = area
+          labelBlockIndex = i
+        }
+      })
+      blocks.forEach((b, i) => {
+        result.push({
+          key: `${item.id}-${i}`,
+          row: b.row,
+          startCol: b.startCol,
+          length: b.length,
+          rowSpan: b.rowSpan,
+          color: item.color,
+          label: i === labelBlockIndex ? `${item.label} ${formatShortWon(item.amount)}` : null,
+        })
+      })
     }
-
-    const rowList = []
-    for (let r = 0; r < owners.length; r += COLUMNS) {
-      const rowOwners = owners.slice(r, r + COLUMNS)
-      const segments = []
-      let i = 0
-      while (i < rowOwners.length) {
-        let j = i + 1
-        while (j < rowOwners.length && sameOwner(rowOwners[j], rowOwners[i])) j++
-        segments.push({ startCol: i, length: j - i, owner: rowOwners[i] })
-        i = j
-      }
-      rowList.push(segments)
-    }
-    return rowList
+    return result
   }, [transactions, totalCells])
 
   return (
-    <div className="coloring-grid" style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)` }}>
-      {rows.map((segments, rowIndex) =>
-        segments.map((seg, segIndex) => (
+    <div className="coloring-grid-wrap">
+      <div
+        className="coloring-base-grid"
+        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: `repeat(${totalRows}, var(--coloring-cell-h))` }}
+      >
+        {Array.from({ length: totalCells }).map((_, i) => (
+          <div key={i} className="coloring-base-cell" />
+        ))}
+      </div>
+      <div
+        className="coloring-overlay-grid"
+        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: `repeat(${totalRows}, var(--coloring-cell-h))` }}
+      >
+        {itemBlocks.map((b) => (
           <div
-            key={`${rowIndex}-${segIndex}`}
-            className={seg.owner ? 'coloring-run' : 'coloring-cell-empty'}
+            key={b.key}
+            className="coloring-run"
             style={{
-              gridColumn: `${seg.startCol + 1} / span ${seg.length}`,
-              gridRow: rowIndex + 1,
-              background: seg.owner ? seg.owner.color : undefined,
+              gridColumn: `${b.startCol + 1} / span ${b.length}`,
+              gridRow: `${b.row + 1} / span ${b.rowSpan}`,
+              background: b.color,
             }}
           >
-            {seg.owner && (
-              <span className="coloring-run-label">
-                {seg.owner.label} {formatShortWon(seg.owner.amount)}
-              </span>
-            )}
+            {b.label && <span className="coloring-run-label">{b.label}</span>}
           </div>
-        )),
-      )}
+        ))}
+      </div>
     </div>
   )
 }

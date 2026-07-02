@@ -795,15 +795,27 @@ a {
 
 /* ---------- Coloring grid ---------- */
 
-.coloring-grid {
+.coloring-grid-wrap {
+  position: relative;
+  --coloring-cell-h: 74px;
+}
+
+.coloring-base-grid {
   display: grid;
-  grid-auto-rows: 74px;
   gap: 3px;
 }
 
-.coloring-cell-empty {
+.coloring-base-cell {
   border-radius: 4px;
-  background: var(--border);
+  background: var(--surface-solid);
+  border: 1px solid rgba(184, 138, 55, 0.35);
+}
+
+.coloring-overlay-grid {
+  display: grid;
+  gap: 3px;
+  position: absolute;
+  inset: 0;
 }
 
 .coloring-run {
@@ -812,7 +824,7 @@ a {
   justify-content: center;
   text-align: center;
   padding: 4px 6px;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 
 .coloring-run-label {
@@ -824,8 +836,8 @@ a {
 }
 
 @media (max-width: 480px) {
-  .coloring-grid {
-    grid-auto-rows: 58px;
+  .coloring-grid-wrap {
+    --coloring-cell-h: 58px;
   }
 
   .coloring-run-label {
