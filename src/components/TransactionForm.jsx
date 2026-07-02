@@ -9,12 +9,14 @@ export default function TransactionForm({ categories, members, currentMemberId, 
   const [amount, setAmount] = useState(initial?.amount ? String(initial.amount) : '')
   const [categoryId, setCategoryId] = useState(initial?.category_id || '')
   const [paymentMethod, setPaymentMethod] = useState(initial?.payment_method || PAYMENT_METHODS[0])
+  const [dueDate, setDueDate] = useState(initial?.due_date || '')
   const [memberId, setMemberId] = useState(initial?.member_id || currentMemberId || '')
   const [memo, setMemo] = useState(initial?.memo || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const filteredCategories = categories.filter((c) => c.type === type)
+  const isCard = paymentMethod === '신용카드' || paymentMethod === '체크카드'
 
   useEffect(() => {
     if (!filteredCategories.find((c) => c.id === categoryId)) {
@@ -43,6 +45,7 @@ export default function TransactionForm({ categories, members, currentMemberId, 
         amount: numAmount,
         category_id: categoryId || null,
         payment_method: paymentMethod,
+        due_date: isCard && dueDate ? dueDate : null,
         member_id: memberId,
         memo: memo || null,
       })
@@ -118,6 +121,14 @@ export default function TransactionForm({ categories, members, currentMemberId, 
               ))}
             </select>
           </div>
+
+          {isCard && (
+            <div className="field">
+              <label>카드 결제일</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} placeholder="실제 청구되는 날짜" />
+              <span className="hint-text">비워두면 결제일 없이 저장돼요</span>
+            </div>
+          )}
 
           <div className="field">
             <label>작성자</label>

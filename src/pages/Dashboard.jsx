@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTransactions } from '../hooks/useTransactions'
 import { useBudgets } from '../hooks/useBudgets'
 import { useProfiles } from '../hooks/useProfiles'
+import { useCardDue } from '../hooks/useCardDue'
 import { formatWon, monthStr, monthRange, monthLabel } from '../utils/format'
 import BudgetProgressBar from '../components/BudgetProgressBar'
 import CategoryDonutChart from '../components/CategoryDonutChart'
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const { transactions, loading } = useTransactions(family?.id, { from, to })
   const { budgets } = useBudgets(family?.id, month)
   const { members } = useProfiles(family?.id)
+  const { dueTransactions } = useCardDue(family?.id, { from, to })
 
   const stats = useMemo(() => {
     let income = 0
@@ -54,6 +56,17 @@ export default function Dashboard() {
     return Object.values(byMember).sort((a, b) => b.expense - a.expense)
   }, [members, transactions])
 
+  const cardDueGroups = useMemo(() => {
+    const byDate = {}
+    for (const t of dueTransactions) {
+      if (!byDate[t.due_date]) byDate[t.due_date] = { date: t.due_date, total: 0, items: [] }
+      byDate[t.due_date].total += Number(t.amount)
+      byDate[t.due_date].items.push(t)
+    }
+    return Object.values(byDate).sort((a, b) => (a.date < b.date ? -1 : 1))
+  }, [dueTransactions])
+  const cardDueTotal = cardDueGroups.reduce((s, g) => s + g.total, 0)
+
   const recent = transactions.slice(0, 5)
 
   return (
@@ -86,6 +99,35 @@ export default function Dashboard() {
           <div className="empty-state">
             설정된 예산이 없어요. <Link to="/budget">예산 설정하러 가기</Link>
           </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="page-header" style={{ marginBottom: 8 }}>
+          <div className="section-title" style={{ marginBottom: 0 }}>
+            💳 이번 달 카드 결제 예정
+          </div>
+          {cardDueTotal > 0 && <span className="hint-text">총 {formatWon(cardDueTotal)}</span>}
+        </div>
+        {cardDueGroups.length === 0 ? (
+          <div className="empty-state">이번 달 결제 예정인 카드값이 없어요</div>
+        ) : (
+          cardDueGroups.map((g) => (
+            <div key={g.date} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}>
+                <span style={{ fontWeight: 700 }}>{g.date} 결제</span>
+                <span style={{ fontWeight: 700 }}>{formatWon(g.total)}</span>
+              </div>
+              {g.items.map((t) => (
+                <div key={t.id} className="tx-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span>
+                    {t.categories?.icon || '💸'} {t.categories?.name || '미분류'} · {t.profiles?.name}
+                  </span>
+                  <span>{formatWon(t.amount)}</span>
+                </div>
+              ))}
+            </div>
+          ))
         )}
       </div>
 
