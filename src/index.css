@@ -1,18 +1,18 @@
 :root {
-  --bg: #f6ecd9;
-  --surface: rgba(255, 251, 240, 0.55);
-  --surface-solid: #fffaf0;
-  --border: rgba(184, 138, 55, 0.25);
-  --text: #4a3a20;
-  --text-muted: #9c8563;
+  --bg: #fbf7ee;
+  --surface: rgba(255, 253, 246, 0.72);
+  --surface-solid: #fffdf8;
+  --border: rgba(184, 138, 55, 0.22);
+  --text: #3a2f1c;
+  --text-muted: #7a6a4d;
   --primary: #d9a441;
   --primary-dark: #b9832a;
-  --income: #7cb342;
-  --expense: #e2703a;
+  --income: #5a9c33;
+  --expense: #d9642f;
   --warn: #ef9d0e;
-  --danger: #d9534f;
+  --danger: #c94a42;
   --radius: 16px;
-  --shadow: 0 8px 32px rgba(158, 116, 43, 0.14), 0 1px 2px rgba(158, 116, 43, 0.08);
+  --shadow: 0 8px 32px rgba(158, 116, 43, 0.1), 0 1px 2px rgba(158, 116, 43, 0.06);
   --glass-blur: blur(16px);
   font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
@@ -29,10 +29,10 @@ body {
   margin: 0;
   color: var(--text);
   background:
-    radial-gradient(circle at 12% 8%, rgba(255, 214, 128, 0.55), transparent 42%),
-    radial-gradient(circle at 88% 15%, rgba(198, 224, 150, 0.5), transparent 45%),
-    radial-gradient(circle at 20% 90%, rgba(255, 196, 120, 0.4), transparent 45%),
-    radial-gradient(circle at 90% 85%, rgba(220, 200, 140, 0.45), transparent 45%),
+    radial-gradient(circle at 12% 8%, rgba(255, 224, 158, 0.28), transparent 42%),
+    radial-gradient(circle at 88% 15%, rgba(210, 230, 175, 0.26), transparent 45%),
+    radial-gradient(circle at 20% 90%, rgba(255, 214, 158, 0.22), transparent 45%),
+    radial-gradient(circle at 90% 85%, rgba(226, 210, 165, 0.24), transparent 45%),
     var(--bg);
   background-attachment: fixed;
 }
@@ -171,6 +171,7 @@ a {
 
 .grid-3 {
   grid-template-columns: repeat(3, 1fr);
+  align-items: stretch;
 }
 
 .grid-2 {
@@ -188,7 +189,9 @@ a {
 .summary-card {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 6px;
+  min-height: 84px;
 }
 
 .summary-label {
