@@ -797,36 +797,38 @@ a {
 
 .coloring-grid {
   display: grid;
+  grid-auto-rows: 74px;
   gap: 3px;
 }
 
-.coloring-cell {
-  position: relative;
-  height: 74px;
+.coloring-cell-empty {
   border-radius: 4px;
   background: var(--border);
-  overflow: visible;
 }
 
-.coloring-cell-label {
-  position: absolute;
-  inset: 4px;
+.coloring-run {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.coloring-run-label {
   font-size: 12px;
   line-height: 1.35;
   font-weight: 700;
   color: #2e2515;
-  white-space: normal;
   overflow-wrap: break-word;
-  z-index: 1;
-  pointer-events: none;
 }
 
 @media (max-width: 480px) {
-  .coloring-cell {
-    height: 58px;
+  .coloring-grid {
+    grid-auto-rows: 58px;
   }
 
-  .coloring-cell-label {
+  .coloring-run-label {
     font-size: 10px;
   }
 }
