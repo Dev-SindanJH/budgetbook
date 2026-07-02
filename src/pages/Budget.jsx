@@ -6,6 +6,7 @@ import { useBudgets } from '../hooks/useBudgets'
 import { upsertBudget } from '../lib/api'
 import { formatWon, monthStr, monthRange, monthLabel, addMonths } from '../utils/format'
 import BudgetProgressBar from '../components/BudgetProgressBar'
+import ColoringGrid from '../components/ColoringGrid'
 
 export default function Budget() {
   const { family } = useAuth()
@@ -35,6 +36,13 @@ export default function Budget() {
 
   const overallBudget = budgets.find((b) => !b.category_id)
   const categoryBudget = (categoryId) => budgets.find((b) => b.category_id === categoryId)
+
+  const categoryTotals = useMemo(() => {
+    return expenseCategories
+      .map((c) => ({ name: c.name, color: c.color, amount: spentByCategory.map[c.id] || 0 }))
+      .filter((c) => c.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+  }, [expenseCategories, spentByCategory])
 
   function draftValue(key, fallback) {
     return drafts[key] !== undefined ? drafts[key] : fallback ?? ''
@@ -111,6 +119,15 @@ export default function Budget() {
         {overallBudget && (
           <BudgetProgressBar spent={spentByCategory.total} limit={Number(overallBudget.limit_amount)} label="이번 달 전체 지출" />
         )}
+      </div>
+
+      <div className="card">
+        <div className="section-title">🎨 색칠 가계부</div>
+        <ColoringGrid
+          categoryTotals={categoryTotals}
+          overallLimit={overallBudget ? Number(overallBudget.limit_amount) : 0}
+          spent={spentByCategory.total}
+        />
       </div>
 
       <div className="card">

@@ -9,6 +9,7 @@ import { getDashboardPrefs } from '../lib/dashboardPrefs'
 import BudgetProgressBar from '../components/BudgetProgressBar'
 import CategoryDonutChart from '../components/CategoryDonutChart'
 import DashboardCalendar from '../components/DashboardCalendar'
+import ColoringGrid from '../components/ColoringGrid'
 
 export default function Dashboard() {
   const { profile, family } = useAuth()
@@ -44,6 +45,11 @@ export default function Dashboard() {
     }
     return Object.values(byCategory).sort((a, b) => b.value - a.value)
   }, [transactions])
+
+  const categoryTotals = useMemo(
+    () => donutData.map((d) => ({ name: d.name, color: d.color, amount: d.value })),
+    [donutData],
+  )
 
   const memberSummary = useMemo(() => {
     const byMember = {}
@@ -113,6 +119,13 @@ export default function Dashboard() {
               설정된 예산이 없어요. <Link to="/budget">예산 설정하러 가기</Link>
             </div>
           )}
+        </div>
+      )}
+
+      {prefs.coloringGrid && (
+        <div className="card">
+          <div className="section-title">🎨 색칠 가계부</div>
+          <ColoringGrid categoryTotals={categoryTotals} overallLimit={effectiveLimit} spent={stats.expense} />
         </div>
       )}
 

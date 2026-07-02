@@ -1,5 +1,6 @@
 export const DASHBOARD_PANELS = [
   { key: 'budget', label: '전체 예산' },
+  { key: 'coloringGrid', label: '색칠 가계부' },
   { key: 'cardDue', label: '카드 결제 예정' },
   { key: 'calendar', label: '달력' },
   { key: 'categoryDonut', label: '카테고리별 지출 비중' },

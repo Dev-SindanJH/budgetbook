@@ -793,6 +793,19 @@ a {
   border-top: 1px solid var(--border);
 }
 
+/* ---------- Coloring grid ---------- */
+
+.coloring-grid {
+  display: grid;
+  gap: 3px;
+}
+
+.coloring-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--border);
+}
+
 @media (max-width: 480px) {
   .calendar-day {
     min-height: 46px;
