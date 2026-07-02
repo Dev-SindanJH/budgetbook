@@ -19,7 +19,7 @@ export function RequireFamily({ children }) {
 }
 
 export function RedirectIfReady({ children }) {
-  const { session, profile } = useAuth()
-  if (session && profile?.family_id) return <Navigate to="/" replace />
+  const { session } = useAuth()
+  if (session) return <Navigate to="/" replace />
   return children
 }
