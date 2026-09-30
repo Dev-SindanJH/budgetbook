@@ -6,7 +6,7 @@ const NAV_ITEMS = [
   { to: '/', label: '홈', end: true },
   { to: '/transactions', label: '내역' },
   { to: '/statistics', label: '통계' },
-  { to: '/budget', label: '예산' },
+  { to: '/budget', label: '자산' },
   { to: '/settings', label: '설정' },
 ]
 
@@ -17,37 +17,39 @@ export default function Layout() {
   return (
     <div className="app-shell">
       <header className="topnav">
-        <div className="topnav-brand">
-          <img src="./favicon.svg" alt="" className="brand-icon" />
-          우리집 가계부
-          {family && <span className="topnav-family">{family.name}</span>}
-        </div>
-        <nav className="topnav-links desktop-only">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => 'topnav-link' + (isActive ? ' active' : '')}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="topnav-right desktop-only">
-          <span className="hint-text">{profile?.name}</span>
-          <button className="btn btn-ghost btn-sm" onClick={signOut}>
-            로그아웃
+        <div className="topnav-inner">
+          <div className="topnav-brand">
+            <img src="./favicon.svg" alt="" className="brand-icon" />
+            우리집 가계부
+            {family && <span className="topnav-family">{family.name}</span>}
+          </div>
+          <nav className="topnav-links desktop-only">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => 'topnav-link' + (isActive ? ' active' : '')}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="topnav-right desktop-only">
+            <span className="hint-text">{profile?.name}</span>
+            <button className="btn btn-ghost btn-sm" onClick={signOut}>
+              로그아웃
+            </button>
+          </div>
+          <button
+            className="menu-toggle"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="메뉴 열기"
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? '✕' : '☰'}
           </button>
         </div>
-        <button
-          className="menu-toggle"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label="메뉴 열기"
-          aria-expanded={menuOpen}
-        >
-          {menuOpen ? '✕' : '☰'}
-        </button>
       </header>
 
       {menuOpen && (

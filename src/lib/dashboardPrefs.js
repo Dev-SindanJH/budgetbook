@@ -1,7 +1,7 @@
 export const DASHBOARD_PANELS = [
-  { key: 'budget', label: '전체 예산' },
+  { key: 'budget', label: '전체 보유 현금' },
   { key: 'coloringGrid', label: '색칠 가계부' },
-  { key: 'cardDue', label: '카드 결제 예정' },
+  { key: 'cardDue', label: '신용카드 자동이체 예정' },
   { key: 'calendar', label: '달력' },
   { key: 'categoryDonut', label: '카테고리별 지출 비중' },
   { key: 'memberSummary', label: '가족 구성원별 지출' },

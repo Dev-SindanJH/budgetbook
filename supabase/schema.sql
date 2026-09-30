@@ -47,6 +47,85 @@ create table if not exists public.transactions (
   created_at timestamptz not null default now()
 );
 
+-- 신용카드는 번호 없이 닉네임과 자동이체일만 보관합니다.
+create table if not exists public.credit_cards (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  owner_id uuid not null references public.profiles(id),
+  nickname text not null check (length(trim(nickname)) between 1 and 40),
+  debit_day integer not null check (debit_day between 1 and 31),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- 기준일 아침의 보유 현금. 이후 거래와 카드 자동이체를 누적해 현재 현금을 계산합니다.
+create table if not exists public.cash_settings (
+  family_id uuid primary key references public.families(id) on delete cascade,
+  opening_date date not null,
+  opening_balance numeric not null check (opening_balance >= 0)
+);
+
+alter table public.transactions add column if not exists card_id uuid references public.credit_cards(id);
+alter table public.transactions add column if not exists card_due_date date;
+create index if not exists transactions_card_due_date_idx on public.transactions(card_due_date);
+
+-- 결제 예정일은 구매 다음 달의 등록된 일자입니다. 말일이 짧으면 말일로 조정합니다.
+create or replace function public.set_credit_card_due_date()
+returns trigger language plpgsql as $$
+declare
+  card_record public.credit_cards%rowtype;
+  next_month date;
+  last_day integer;
+  recalculate boolean := tg_op = 'INSERT';
+begin
+  if new.type = 'expense' and new.payment_method = '신용카드' then
+    -- 기존 내역은 카드 정보가 없을 수 있습니다. 수정할 때는 반드시 지정합니다.
+    if new.card_id is null then
+      if tg_op = 'INSERT' then
+        raise exception '등록된 신용카드를 선택해주세요';
+      elsif old.payment_method is distinct from new.payment_method
+         or old.card_id is distinct from new.card_id then
+        raise exception '등록된 신용카드를 선택해주세요';
+      end if;
+      new.card_due_date := null;
+      return new;
+    end if;
+    select * into card_record from public.credit_cards where id = new.card_id;
+    if not found or card_record.family_id <> new.family_id or card_record.owner_id <> new.member_id then
+      raise exception '작성자에게 등록된 신용카드를 선택해주세요';
+    end if;
+    if not card_record.active then
+      if tg_op = 'INSERT' then
+        raise exception '사용 중인 신용카드를 선택해주세요';
+      elsif old.card_id is distinct from new.card_id then
+        raise exception '사용 중인 신용카드를 선택해주세요';
+      end if;
+    end if;
+    -- 카드 설정 변경이 이미 기록한 내역의 예정일을 바꾸지 않도록 저장된 날짜를 유지합니다.
+    if tg_op = 'UPDATE' then
+      recalculate := old.date is distinct from new.date
+        or old.card_id is distinct from new.card_id
+        or old.payment_method is distinct from new.payment_method;
+    end if;
+    if recalculate then
+      next_month := (date_trunc('month', new.date) + interval '1 month')::date;
+      last_day := extract(day from (next_month + interval '1 month - 1 day'))::integer;
+      new.card_due_date := next_month + (least(card_record.debit_day, last_day) - 1);
+    else
+      new.card_due_date := old.card_due_date;
+    end if;
+  else
+    new.card_id := null;
+    new.card_due_date := null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_transaction_set_card_due_date on public.transactions;
+create trigger on_transaction_set_card_due_date before insert or update on public.transactions
+  for each row execute function public.set_credit_card_due_date();
+
 create table if not exists public.budgets (
   id uuid primary key default gen_random_uuid(),
   family_id uuid not null references public.families(id) on delete cascade,
@@ -155,6 +234,8 @@ alter table public.families enable row level security;
 alter table public.profiles enable row level security;
 alter table public.categories enable row level security;
 alter table public.transactions enable row level security;
+alter table public.credit_cards enable row level security;
+alter table public.cash_settings enable row level security;
 alter table public.budgets enable row level security;
 
 -- families: 내 가족만 조회 가능
@@ -183,6 +264,24 @@ create policy "transactions_all_family" on public.transactions
   for all using (family_id = public.current_family_id())
   with check (family_id = public.current_family_id());
 
+drop policy if exists "credit_cards_select_family" on public.credit_cards;
+create policy "credit_cards_select_family" on public.credit_cards
+  for select using (family_id = public.current_family_id());
+
+drop policy if exists "credit_cards_insert_own" on public.credit_cards;
+create policy "credit_cards_insert_own" on public.credit_cards
+  for insert with check (family_id = public.current_family_id() and owner_id = auth.uid());
+
+drop policy if exists "credit_cards_update_own" on public.credit_cards;
+create policy "credit_cards_update_own" on public.credit_cards
+  for update using (family_id = public.current_family_id() and owner_id = auth.uid())
+  with check (family_id = public.current_family_id() and owner_id = auth.uid());
+
+drop policy if exists "cash_settings_all_family" on public.cash_settings;
+create policy "cash_settings_all_family" on public.cash_settings
+  for all using (family_id = public.current_family_id())
+  with check (family_id = public.current_family_id());
+
 -- budgets: family_id 기준
 drop policy if exists "budgets_all_family" on public.budgets;
 create policy "budgets_all_family" on public.budgets
@@ -195,7 +294,150 @@ create policy "budgets_all_family" on public.budgets
 alter publication supabase_realtime add table public.transactions;
 
 -- ------------------------------------------------------------
--- 마이그레이션: due_date 컬럼을 추가했었다면 더 이상 쓰지 않으므로 제거합니다
--- (카드 결제일은 거래의 date 컬럼을 그대로 사용하는 것으로 단순화했습니다)
+-- 예전 임시 컬럼은 사용하지 않습니다. 카드 자동이체일은 card_due_date에 저장합니다.
 -- ------------------------------------------------------------
 alter table public.transactions drop column if exists due_date;
+
+-- 적금 자동납입
+-- Apply to existing projects in the Supabase SQL Editor.
+create table if not exists public.savings_plans (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  member_id uuid not null references public.profiles(id),
+  name text not null check (length(trim(name)) between 1 and 80),
+  monthly_amount numeric not null check (monthly_amount > 0),
+  debit_day integer not null check (debit_day between 1 and 31),
+  start_month date not null check (extract(day from start_month) = 1),
+  maturity_date date not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  check (maturity_date >= start_month)
+);
+
+alter table public.transactions
+  add column if not exists savings_plan_id uuid references public.savings_plans(id) on delete set null;
+create unique index if not exists transactions_savings_plan_date_key
+  on public.transactions(savings_plan_id, date) where savings_plan_id is not null;
+
+alter table public.savings_plans enable row level security;
+grant select, insert, update, delete on public.savings_plans to authenticated;
+drop policy if exists "savings_plans_all_family" on public.savings_plans;
+create policy "savings_plans_all_family" on public.savings_plans
+  for all to authenticated
+  using (family_id = (select public.current_family_id()))
+  with check (family_id = (select public.current_family_id()));
+
+-- One transaction is materialized for each scheduled payment. Future dates do
+-- not affect today's cash balance; changing or stopping a plan keeps its past.
+create or replace function public.sync_savings_plan_transactions()
+returns trigger language plpgsql set search_path = public, pg_temp as $$
+declare
+  plan public.savings_plans%rowtype;
+  payment_month date;
+  payment_date date;
+  savings_category_id uuid;
+  local_today date := (now() at time zone 'Asia/Seoul')::date;
+begin
+  if tg_op = 'DELETE' then
+    plan := old;
+  else
+    plan := new;
+    if not exists (
+      select 1 from public.profiles p
+      where p.id = plan.member_id and p.family_id = plan.family_id
+    ) then
+      raise exception '같은 가족의 구성원을 선택해주세요';
+    end if;
+  end if;
+
+  delete from public.transactions
+  where savings_plan_id = plan.id and date >= local_today;
+
+  if tg_op = 'DELETE' then return old; end if;
+  if not plan.active then return new; end if;
+
+  select id into savings_category_id from public.categories
+  where family_id = plan.family_id and type = 'expense' and name = '적금'
+  order by created_at limit 1;
+  if savings_category_id is null then
+    insert into public.categories (family_id, name, type, color, icon)
+    values (plan.family_id, '적금', 'expense', '#14b8a6', '🏦')
+    returning id into savings_category_id;
+  end if;
+
+  for payment_month in
+    select generate_series(
+      plan.start_month,
+      date_trunc('month', plan.maturity_date)::date,
+      interval '1 month'
+    )::date
+  loop
+    payment_date := payment_month + (
+      least(plan.debit_day, extract(day from (payment_month + interval '1 month - 1 day'))::integer) - 1
+    );
+    if payment_date >= local_today and payment_date <= plan.maturity_date then
+      insert into public.transactions
+        (family_id, member_id, date, type, amount, category_id, payment_method, memo, savings_plan_id)
+      values
+        (plan.family_id, plan.member_id, payment_date, 'expense', plan.monthly_amount,
+         savings_category_id, '계좌이체', plan.name || ' · 적금 자동납입', plan.id);
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_savings_plan_sync_transactions on public.savings_plans;
+drop trigger if exists on_savings_plan_delete_transactions on public.savings_plans;
+create trigger on_savings_plan_sync_transactions
+  after insert or update on public.savings_plans
+  for each row execute function public.sync_savings_plan_transactions();
+create trigger on_savings_plan_delete_transactions
+  before delete on public.savings_plans
+  for each row execute function public.sync_savings_plan_transactions();
+
+-- Existing families receive a category; new families are covered by the trigger.
+insert into public.categories (family_id, name, type, color, icon)
+select f.id, '적금', 'expense', '#14b8a6', '🏦'
+from public.families f
+where not exists (
+  select 1 from public.categories c
+  where c.family_id = f.id and c.type = 'expense' and c.name = '적금'
+);
+
+-- 보유 주식과 KRX 종가 캐시
+-- Korean listed shares and the last closing price fetched by the server.
+create table if not exists public.stock_holdings (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  symbol text not null check (symbol ~ '^[0-9]{6}$'),
+  market text not null check (market in ('KOSPI', 'KOSDAQ')),
+  quantity numeric(20, 0) not null check (quantity > 0),
+  created_at timestamptz not null default now(),
+  unique (family_id, symbol)
+);
+
+create table if not exists public.stock_quotes (
+  symbol text primary key check (symbol ~ '^[0-9]{6}$'),
+  market text not null check (market in ('KOSPI', 'KOSDAQ')),
+  name text not null,
+  closing_price numeric not null check (closing_price > 0),
+  price_date date not null,
+  fetched_at timestamptz not null default now()
+);
+
+alter table public.stock_holdings enable row level security;
+alter table public.stock_quotes enable row level security;
+grant select, insert, update, delete on public.stock_holdings to authenticated;
+grant select on public.stock_quotes to authenticated;
+grant select, insert, update, delete on public.stock_quotes to service_role;
+
+drop policy if exists "stock_holdings_all_family" on public.stock_holdings;
+create policy "stock_holdings_all_family" on public.stock_holdings
+  for all to authenticated
+  using (family_id = (select public.current_family_id()))
+  with check (family_id = (select public.current_family_id()));
+
+drop policy if exists "stock_quotes_read_authenticated" on public.stock_quotes;
+create policy "stock_quotes_read_authenticated" on public.stock_quotes
+  for select to authenticated using (true);

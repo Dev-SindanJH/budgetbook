@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { useAuth } from '../context/AuthContext'
 import { useTransactions } from '../hooks/useTransactions'
 import { useProfiles } from '../hooks/useProfiles'
-import { formatWon, addMonths, monthStr, monthLabel } from '../utils/format'
+import { formatWon, addMonths, monthStr, monthLabel, monthRange, todayStr } from '../utils/format'
 import CategoryDonutChart from '../components/CategoryDonutChart'
 
 const PERIODS = [
@@ -17,11 +17,11 @@ function computeRange(mode, customFrom, customTo) {
   const now = new Date()
   if (mode === 'thisMonth') {
     const m = monthStr(now)
-    return { from: `${m}-01`, to: undefined, label: monthLabel(m) }
+    return { ...monthRange(m), label: monthLabel(m) }
   }
   if (mode === 'lastMonth') {
     const m = addMonths(monthStr(now), -1)
-    return { from: `${m}-01`, to: undefined, matchMonth: m, label: monthLabel(m) }
+    return { ...monthRange(m), label: monthLabel(m) }
   }
   if (mode === 'thisYear') {
     return { from: `${now.getFullYear()}-01-01`, to: `${now.getFullYear()}-12-31`, label: `${now.getFullYear()}년` }
@@ -44,7 +44,7 @@ export default function Statistics() {
     return allTransactions.filter((t) => {
       if (range.from && t.date < range.from) return false
       if (range.to && t.date > range.to) return false
-      if (mode === 'lastMonth' && range.matchMonth && t.date.slice(0, 7) !== range.matchMonth) return false
+      if (t.savings_plan_id && t.date > todayStr()) return false
       return true
     })
   }, [allTransactions, range, mode])
@@ -70,7 +70,7 @@ export default function Statistics() {
       let income = 0
       let expense = 0
       for (const t of allTransactions) {
-        if (t.date.slice(0, 7) !== m) continue
+        if (t.date.slice(0, 7) !== m || (t.savings_plan_id && t.date > todayStr())) continue
         if (t.type === 'income') income += Number(t.amount)
         else expense += Number(t.amount)
       }
@@ -144,6 +144,7 @@ export default function Statistics() {
         </div>
       </div>
 
+      <div className="statistics-lower-grid">
       <div className="card">
         <div className="section-title">최근 6개월 수입/지출 추이</div>
         <div className="chart-box tall">
@@ -178,6 +179,7 @@ export default function Statistics() {
             </ResponsiveContainer>
           </div>
         )}
+      </div>
       </div>
     </div>
   )

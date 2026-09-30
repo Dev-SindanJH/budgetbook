@@ -4,35 +4,60 @@ import { useAuth } from '../context/AuthContext'
 import { useTransactions } from '../hooks/useTransactions'
 import { useBudgets } from '../hooks/useBudgets'
 import { useProfiles } from '../hooks/useProfiles'
-import { formatWon, monthStr, monthRange, monthLabel, addMonths } from '../utils/format'
+import { useCategories } from '../hooks/useCategories'
+import { useCreditCards } from '../hooks/useCreditCards'
+import { useCashSettings } from '../hooks/useCashSettings'
+import { useStockHoldings } from '../hooks/useStockHoldings'
+import { addTransaction } from '../lib/api'
+import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
 import { getDashboardPrefs } from '../lib/dashboardPrefs'
-import BudgetProgressBar from '../components/BudgetProgressBar'
 import CategoryDonutChart from '../components/CategoryDonutChart'
 import DashboardCalendar from '../components/DashboardCalendar'
 import ColoringGrid from '../components/ColoringGrid'
+import TransactionForm from '../components/TransactionForm'
+import { isCreditCardExpense, isImmediateExpense, recordedCashBalance } from '../utils/creditCards'
 
 export default function Dashboard() {
   const { profile, family } = useAuth()
   const [month, setMonth] = useState(monthStr())
+  const [formType, setFormType] = useState(null)
   const { from, to } = monthRange(month)
-  const { transactions, loading } = useTransactions(family?.id, { from, to })
+  const { transactions: allTransactions, loading, refresh } = useTransactions(family?.id)
+  const transactions = useMemo(() => allTransactions.filter((t) => t.date >= from && t.date <= to && (!t.savings_plan_id || t.date <= todayStr())), [allTransactions, from, to])
   const { budgets } = useBudgets(family?.id, month)
   const { members } = useProfiles(family?.id)
+  const { categories } = useCategories(family?.id)
+  const { cards } = useCreditCards(family?.id)
+  const { cashSettings } = useCashSettings(family?.id)
+  const { holdings, totalValue: stockValue, missingCount: missingStocks } = useStockHoldings(family?.id)
   const prefs = getDashboardPrefs()
+
+  async function handleAddTransaction(payload) {
+    await addTransaction({ ...payload, family_id: family.id })
+    const savedMonth = payload.date.slice(0, 7)
+    await refresh()
+    if (savedMonth !== month) setMonth(savedMonth)
+  }
 
   const stats = useMemo(() => {
     let income = 0
     let expense = 0
+    let immediateExpense = 0
     for (const t of transactions) {
       if (t.type === 'income') income += Number(t.amount)
-      else expense += Number(t.amount)
+      else {
+        expense += Number(t.amount)
+        if (isImmediateExpense(t)) immediateExpense += Number(t.amount)
+      }
     }
-    return { income, expense, balance: income - expense }
-  }, [transactions])
+    const cardPayments = allTransactions
+      .filter((t) => isCreditCardExpense(t) && t.card_due_date?.slice(0, 7) === month)
+      .reduce((sum, t) => sum + Number(t.amount), 0)
+    return { income, expense, immediateExpense, cardPayments, cashFlow: income - immediateExpense - cardPayments }
+  }, [transactions, allTransactions, month])
 
-  const overallBudget = budgets.find((b) => !b.category_id)
   const categoryBudgetTotal = budgets.filter((b) => b.category_id).reduce((s, b) => s + Number(b.limit_amount), 0)
-  const effectiveLimit = overallBudget ? Number(overallBudget.limit_amount) : categoryBudgetTotal
+  const effectiveLimit = categoryBudgetTotal
 
   const donutData = useMemo(() => {
     const byCategory = {}
@@ -62,16 +87,24 @@ export default function Dashboard() {
 
   const cardDueGroups = useMemo(() => {
     const byDate = {}
-    for (const t of transactions) {
-      if (t.type !== 'expense') continue
-      if (t.payment_method !== '신용카드' && t.payment_method !== '체크카드') continue
-      if (!byDate[t.date]) byDate[t.date] = { date: t.date, total: 0, items: [] }
-      byDate[t.date].total += Number(t.amount)
-      byDate[t.date].items.push(t)
+    const nextMonth = addMonths(month, 1)
+    for (const t of allTransactions) {
+      if (!isCreditCardExpense(t) || !t.card_due_date) continue
+      const dueMonth = t.card_due_date.slice(0, 7)
+      if (dueMonth !== month && dueMonth !== nextMonth) continue
+      if (!byDate[t.card_due_date]) byDate[t.card_due_date] = { date: t.card_due_date, total: 0, items: [] }
+      byDate[t.card_due_date].total += Number(t.amount)
+      byDate[t.card_due_date].items.push(t)
     }
     return Object.values(byDate).sort((a, b) => (a.date < b.date ? -1 : 1))
-  }, [transactions])
+  }, [allTransactions, month])
   const cardDueTotal = cardDueGroups.reduce((s, g) => s + g.total, 0)
+  const legacyCardCount = allTransactions.filter((t) => isCreditCardExpense(t) && !t.card_due_date).length
+  const today = todayStr()
+  const currentCash = recordedCashBalance(allTransactions, cashSettings, today)
+  const unpaidCredit = allTransactions
+    .filter((t) => isCreditCardExpense(t) && t.date <= today && t.card_due_date > today)
+    .reduce((sum, t) => sum + Number(t.amount), 0)
 
   const recent = transactions.slice(0, 5)
 
@@ -93,31 +126,50 @@ export default function Dashboard() {
 
       <div className="grid grid-3">
         <div className="card summary-card">
-          <span className="summary-label">총 수입</span>
+          <div className="summary-card-header">
+            <span className="summary-label">총 수입</span>
+            <button type="button" className="summary-add-button income" aria-label="수입 추가" onClick={() => setFormType('income')}>
+              +
+            </button>
+          </div>
           <span className="summary-value income">{formatWon(stats.income)}</span>
         </div>
         <div className="card summary-card">
-          <span className="summary-label">총 지출</span>
+          <div className="summary-card-header">
+            <span className="summary-label">총 지출</span>
+            <button type="button" className="summary-add-button expense" aria-label="지출 추가" onClick={() => setFormType('expense')}>
+              +
+            </button>
+          </div>
           <span className="summary-value expense">{formatWon(stats.expense)}</span>
         </div>
         <div className="card summary-card">
-          <span className="summary-label">잔액</span>
-          <span className="summary-value">{formatWon(stats.balance)}</span>
+          <span className="summary-label">이달 예상 현금 흐름</span>
+          <span className="summary-value">{formatWon(stats.cashFlow)}</span>
+          <span className="hint-text">수입 − 현금·체크카드 등 {formatWon(stats.immediateExpense)} − 이번 달 신용카드 자동이체 {formatWon(stats.cardPayments)}</span>
         </div>
       </div>
-
-      {prefs.budget && (
-        <div className="card">
-          <div className="section-title">전체 예산</div>
-          {effectiveLimit > 0 ? (
-            <BudgetProgressBar spent={stats.expense} limit={effectiveLimit} label="전체 지출" />
-          ) : (
-            <div className="empty-state">
-              설정된 예산이 없어요. <Link to="/budget">예산 설정하러 가기</Link>
-            </div>
-          )}
+      <div className="hint-text cash-flow-note">총 지출은 사용한 달에, 신용카드 자동이체는 돈이 빠지는 달의 예상 현금 흐름에 한 번만 반영해요. 이 금액은 보유 현금 잔액이 아니에요.</div>
+      <div className="grid grid-3">
+        {prefs.budget && <div className="card summary-card">
+          <span className="summary-label">전체 보유 현금</span>
+          {currentCash === null
+            ? <span className="hint-text"><Link to="/budget">보유 현금 입력하기</Link></span>
+            : <span className="summary-value">{formatWon(currentCash)}</span>}
+          <span className="hint-text">{today}까지의 수입, 현금 지출, 적금 납입과 카드 자동이체를 반영했어요.</span>
+          {legacyCardCount > 0 && <span className="hint-text">카드 미지정 기존 내역 {legacyCardCount}건은 반영되지 않았어요.</span>}
+        </div>}
+        <div className="card summary-card">
+          <span className="summary-label">보유 주식 잔액</span>
+          <span className="summary-value">{holdings.length > 0 && missingStocks === holdings.length ? '시세 조회 전' : formatWon(stockValue)}</span>
+          <span className="hint-text">KRX 최근 종가 기준 · <Link to="/budget">보유 종목 관리</Link>{missingStocks > 0 && ` · ${missingStocks}종목 시세 없음`}</span>
         </div>
-      )}
+        <div className="card summary-card">
+          <span className="summary-label">앞으로 빠질 신용카드값</span>
+          <span className="summary-value">{formatWon(unpaidCredit)}</span>
+          <span className="hint-text">오늘까지 사용했고 자동이체일이 아직 지나지 않은 금액이에요.</span>
+        </div>
+      </div>
 
       {prefs.coloringGrid && (
         <div className="card">
@@ -126,27 +178,28 @@ export default function Dashboard() {
         </div>
       )}
 
+      <div className="dashboard-wide-grid">
       {prefs.cardDue && (
         <div className="card">
           <div className="page-header" style={{ marginBottom: 8 }}>
             <div className="section-title" style={{ marginBottom: 0 }}>
-              💳 카드 결제 예정
+              💳 신용카드 자동이체 · {monthLabel(month)} / {monthLabel(addMonths(month, 1))}
             </div>
             {cardDueTotal > 0 && <span className="hint-text">총 {formatWon(cardDueTotal)}</span>}
           </div>
           {cardDueGroups.length === 0 ? (
-            <div className="empty-state">이 달에 카드로 결제한 내역이 없어요</div>
+            <div className="empty-state">이 기간에 자동이체할 신용카드 내역이 없어요</div>
           ) : (
             cardDueGroups.map((g) => (
               <div key={g.date} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}>
-                  <span style={{ fontWeight: 700 }}>{g.date} 결제</span>
+                  <span style={{ fontWeight: 700 }}>{g.date} 자동이체 예정</span>
                   <span style={{ fontWeight: 700 }}>{formatWon(g.total)}</span>
                 </div>
                 {g.items.map((t) => (
                   <div key={t.id} className="tx-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                     <span>
-                      {t.categories?.icon || '💸'} {t.categories?.name || '미분류'} · {t.profiles?.name}
+                      {t.categories?.icon || '💸'} {t.categories?.name || '미분류'} · {cards.find((c) => c.id === t.card_id)?.nickname || '신용카드'} · {t.profiles?.name}
                       {t.memo && ` · ${t.memo}`}
                     </span>
                     <span>{formatWon(t.amount)}</span>
@@ -155,6 +208,7 @@ export default function Dashboard() {
               </div>
             ))
           )}
+          {legacyCardCount > 0 && <div className="hint-text">카드 미지정 기존 내역 {legacyCardCount}건은 자동이체 합계에서 제외됐어요. 내역 수정에서 카드를 선택하면 반영돼요.</div>}
         </div>
       )}
 
@@ -164,6 +218,7 @@ export default function Dashboard() {
           <DashboardCalendar month={month} transactions={transactions} />
         </div>
       )}
+      </div>
 
       {(prefs.categoryDonut || prefs.memberSummary) && (
         <div className="grid grid-2">
@@ -240,6 +295,18 @@ export default function Dashboard() {
             ))
           )}
         </div>
+      )}
+
+      {formType && (
+        <TransactionForm
+          categories={categories}
+          cards={cards}
+          members={members}
+          currentMemberId={profile?.id}
+          defaultType={formType}
+          onSubmit={handleAddTransaction}
+          onClose={() => setFormType(null)}
+        />
       )}
     </div>
   )

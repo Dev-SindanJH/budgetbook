@@ -1,21 +1,143 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../hooks/useCategories'
 import { useTransactions } from '../hooks/useTransactions'
 import { useBudgets } from '../hooks/useBudgets'
-import { upsertBudget } from '../lib/api'
-import { formatWon, monthStr, monthRange, monthLabel, addMonths } from '../utils/format'
+import { useCashSettings } from '../hooks/useCashSettings'
+import { useSavingsPlans } from '../hooks/useSavingsPlans'
+import { useStockHoldings } from '../hooks/useStockHoldings'
+import { upsertBudget, saveCashSettings, addSavingsPlan, updateSavingsPlan, saveStockHolding, deleteStockHolding } from '../lib/api'
+import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
+import { recordedCashBalance } from '../utils/creditCards'
 import BudgetProgressBar from '../components/BudgetProgressBar'
 import ColoringGrid from '../components/ColoringGrid'
 
 export default function Budget() {
-  const { family } = useAuth()
+  const { family, profile } = useAuth()
   const [month, setMonth] = useState(monthStr())
   const { from, to } = monthRange(month)
 
   const { categories } = useCategories(family?.id)
-  const { transactions } = useTransactions(family?.id, { from, to })
+  const { transactions: monthTransactions } = useTransactions(family?.id, { from, to })
+  const transactions = useMemo(() => monthTransactions.filter((t) => !t.savings_plan_id || t.date <= todayStr()), [monthTransactions])
+  const { transactions: allTransactions, refresh: refreshTransactions } = useTransactions(family?.id)
   const { budgets, refresh } = useBudgets(family?.id, month)
+  const { cashSettings, refresh: refreshCashSettings } = useCashSettings(family?.id)
+  const { plans, error: plansError, refresh: refreshPlans } = useSavingsPlans(family?.id)
+  const { holdings, error: stocksError, quoteError, refreshingPrices, totalValue: stockValue, missingCount, refresh: refreshStocks } = useStockHoldings(family?.id)
+
+  const [openingDate, setOpeningDate] = useState(todayStr())
+  const [openingBalance, setOpeningBalance] = useState('')
+  const [cashMessage, setCashMessage] = useState('')
+  const [savingCash, setSavingCash] = useState(false)
+  const [planName, setPlanName] = useState('')
+  const [planAmount, setPlanAmount] = useState('')
+  const [planDay, setPlanDay] = useState('1')
+  const [planStartMonth, setPlanStartMonth] = useState(monthStr())
+  const [planMaturity, setPlanMaturity] = useState('')
+  const [planMessage, setPlanMessage] = useState('')
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [stockSymbol, setStockSymbol] = useState('')
+  const [stockMarket, setStockMarket] = useState('KOSPI')
+  const [stockQuantity, setStockQuantity] = useState('')
+  const [stockMessage, setStockMessage] = useState('')
+  const [savingStock, setSavingStock] = useState(false)
+
+  useEffect(() => {
+    if (cashSettings) {
+      setOpeningDate(cashSettings.opening_date)
+      setOpeningBalance(String(cashSettings.opening_balance))
+    }
+  }, [cashSettings])
+
+  const currentCash = recordedCashBalance(allTransactions, cashSettings, todayStr())
+
+  async function handleSaveCash(e) {
+    e.preventDefault()
+    const amount = Number(openingBalance)
+    if (!openingDate || openingDate > todayStr() || openingBalance === '' || !Number.isFinite(amount) || amount < 0) {
+      setCashMessage('오늘 또는 이전의 기준일과 0원 이상의 보유 현금을 입력해주세요')
+      return
+    }
+    setSavingCash(true)
+    setCashMessage('')
+    try {
+      await saveCashSettings({ family_id: family.id, opening_date: openingDate, opening_balance: amount })
+      await refreshCashSettings()
+      setCashMessage('보유 현금 기준값을 저장했어요')
+    } catch (err) {
+      setCashMessage(err.message || '보유 현금을 저장하지 못했어요')
+    } finally {
+      setSavingCash(false)
+    }
+  }
+
+  async function handleAddPlan(e) {
+    e.preventDefault()
+    const amount = Number(planAmount)
+    const day = Number(planDay)
+    if (!planName.trim() || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(day) || day < 1 || day > 31 || !planStartMonth || !planMaturity || planMaturity < `${planStartMonth}-01`) {
+      setPlanMessage('적금 이름, 월 납입액, 납입일, 첫 납입월과 만기를 확인해주세요')
+      return
+    }
+    setSavingPlan(true)
+    setPlanMessage('')
+    try {
+      await addSavingsPlan({ family_id: family.id, member_id: profile.id, name: planName.trim(), monthly_amount: amount, debit_day: day, start_month: `${planStartMonth}-01`, maturity_date: planMaturity })
+      await Promise.all([refreshPlans(), refreshTransactions()])
+      setPlanName('')
+      setPlanAmount('')
+      setPlanMessage('적금과 납입 예정 지출을 등록했어요')
+    } catch (err) {
+      setPlanMessage(err.message || '적금을 등록하지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.')
+    } finally {
+      setSavingPlan(false)
+    }
+  }
+
+  async function handleTogglePlan(plan) {
+    try {
+      await updateSavingsPlan(plan.id, { active: !plan.active })
+      await Promise.all([refreshPlans(), refreshTransactions()])
+      setPlanMessage(plan.active ? '앞으로 예정된 납입을 중지했어요' : '납입 일정을 다시 등록했어요')
+    } catch (err) {
+      setPlanMessage(err.message || '적금 상태를 변경하지 못했어요')
+    }
+  }
+
+  async function handleSaveStock(e) {
+    e.preventDefault()
+    const symbol = stockSymbol.trim()
+    const quantity = Number(stockQuantity)
+    if (!/^\d{6}$/.test(symbol) || !Number.isSafeInteger(quantity) || quantity <= 0) {
+      setStockMessage('6자리 종목코드와 1주 이상의 보유 수량을 입력해주세요')
+      return
+    }
+    setSavingStock(true)
+    setStockMessage('')
+    try {
+      await saveStockHolding({ familyId: family.id, symbol, market: stockMarket, quantity })
+      await refreshStocks()
+      setStockSymbol('')
+      setStockQuantity('')
+      setStockMessage('보유 수량을 저장했어요')
+    } catch (err) {
+      setStockMessage(err.message || '보유 주식을 저장하지 못했어요')
+    } finally {
+      setSavingStock(false)
+    }
+  }
+
+  async function handleDeleteStock(stock) {
+    if (!window.confirm(`${stock.quote?.name || stock.symbol} 보유 내역을 삭제할까요?`)) return
+    try {
+      await deleteStockHolding(stock.id)
+      await refreshStocks({ updatePrices: false })
+      setStockMessage('보유 내역을 삭제했어요')
+    } catch (err) {
+      setStockMessage(err.message || '보유 내역을 삭제하지 못했어요')
+    }
+  }
 
   const [drafts, setDrafts] = useState({})
   const [savingKey, setSavingKey] = useState(null)
@@ -34,7 +156,7 @@ export default function Budget() {
     return { map, total }
   }, [transactions])
 
-  const overallBudget = budgets.find((b) => !b.category_id)
+  const categoryBudgetTotal = budgets.filter((b) => b.category_id).reduce((sum, b) => sum + Number(b.limit_amount), 0)
   const categoryBudget = (categoryId) => budgets.find((b) => b.category_id === categoryId)
 
   const expenseTransactions = useMemo(() => transactions.filter((t) => t.type === 'expense'), [transactions])
@@ -67,7 +189,7 @@ export default function Budget() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">예산 관리</h1>
+        <h1 className="page-title">자산 관리</h1>
         <div className="filter-bar" style={{ marginBottom: 0 }}>
           <button className="btn btn-sm" onClick={() => setMonth(addMonths(month, -1))}>
             ← 이전 달
@@ -77,6 +199,71 @@ export default function Budget() {
             다음 달 →
           </button>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="section-title">전체 보유 현금</div>
+        <div className="summary-value" style={{ marginBottom: 8 }}>{currentCash === null ? '기준 금액을 입력해주세요' : formatWon(currentCash)}</div>
+        <div className="hint-text" style={{ marginBottom: 12 }}>기준일 아침의 현금을 입력하면 이후 수입, 현금 지출, 적금 납입, 신용카드 자동이체를 날짜에 맞춰 더하고 빼요.</div>
+        <form className="credit-card-form" onSubmit={handleSaveCash}>
+          <div className="field"><label htmlFor="asset-opening-date">기준일</label><input id="asset-opening-date" type="date" max={todayStr()} value={openingDate} onChange={(e) => setOpeningDate(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="asset-opening-balance">그날 아침 보유 현금</label><input id="asset-opening-balance" type="number" min="0" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} required /></div>
+          <button className="btn btn-primary" type="submit" disabled={savingCash}>{savingCash ? '저장 중...' : '현금 저장'}</button>
+        </form>
+        {cashMessage && <div className="hint-text" role="status">{cashMessage}</div>}
+      </div>
+
+      <div className="card">
+        <div className="section-title">보유 주식 잔액</div>
+        <div className="summary-value" style={{ marginBottom: 8 }}>{holdings.length === 0 ? formatWon(0) : missingCount === holdings.length ? '시세 조회 전' : formatWon(stockValue)}</div>
+        <div className="hint-text" style={{ marginBottom: 12 }}>KRX의 최근 제공 종가 × 보유 수량으로 평가해요. 현금 잔액에는 합산하지 않아요.</div>
+        {missingCount > 0 && <div className="hint-text" style={{ marginBottom: 12 }}>시세가 없는 {missingCount}종목은 표시 금액에서 제외했어요.</div>}
+        {stocksError && <div className="error-text">보유 주식을 불러오지 못했어요: {stocksError}</div>}
+        {quoteError && <div className="error-text">시세 조회: {quoteError}</div>}
+        {holdings.map((stock) => {
+          const quote = stock.quote?.market === stock.market ? stock.quote : null
+          return <div className="settings-list-item stock-holding-item" key={stock.id}>
+            <div>
+              <strong>{quote?.name || stock.symbol}</strong> <span className="hint-text">{stock.symbol} · {stock.market}</span>
+              <div className="hint-text">{Number(stock.quantity).toLocaleString('ko-KR')}주{quote ? ` × ${formatWon(quote.closing_price)} · ${quote.price_date} 종가` : ' · 시세 없음'}</div>
+            </div>
+            <div className="stock-holding-actions">
+              <strong>{quote ? formatWon(Number(stock.quantity) * Number(quote.closing_price)) : '—'}</strong>
+              <button type="button" className="btn btn-sm" onClick={() => { setStockSymbol(stock.symbol); setStockMarket(stock.market); setStockQuantity(String(stock.quantity)) }}>수량 변경</button>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleDeleteStock(stock)}>삭제</button>
+            </div>
+          </div>
+        })}
+        <form className="stock-form" onSubmit={handleSaveStock}>
+          <div className="field"><label htmlFor="stock-symbol">종목코드</label><input id="stock-symbol" value={stockSymbol} onChange={(e) => setStockSymbol(e.target.value)} placeholder="예: 005930" inputMode="numeric" maxLength={6} required /></div>
+          <div className="field"><label htmlFor="stock-market">시장</label><select id="stock-market" value={stockMarket} onChange={(e) => setStockMarket(e.target.value)}><option value="KOSPI">코스피</option><option value="KOSDAQ">코스닥</option></select></div>
+          <div className="field"><label htmlFor="stock-quantity">총 보유 수량</label><input id="stock-quantity" type="number" min="1" step="1" value={stockQuantity} onChange={(e) => setStockQuantity(e.target.value)} required /></div>
+          <button className="btn btn-primary" type="submit" disabled={savingStock}>{savingStock ? '저장 중...' : '주식 저장'}</button>
+          <button className="btn" type="button" disabled={refreshingPrices || holdings.length === 0} onClick={() => refreshStocks({ forcePrices: true })}>{refreshingPrices ? '조회 중...' : '시세 새로고침'}</button>
+        </form>
+        {stockMessage && <div className="hint-text" role="status">{stockMessage}</div>}
+      </div>
+
+      <div className="card">
+        <div className="section-title">적금</div>
+        <div className="hint-text" style={{ marginBottom: 12 }}>오늘 이후의 납입일에 계좌이체 지출이 자동 등록돼요. 31일 등 말일이 없는 달에는 그 달의 마지막 날에 납입해요.</div>
+        {plansError && <div className="error-text">적금 목록을 불러오지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.</div>}
+        {plans.length === 0 && <div className="hint-text" style={{ marginBottom: 12 }}>등록한 적금이 없어요.</div>}
+        {plans.map((plan) => (
+          <div className="settings-list-item" key={plan.id}>
+            <span><strong>{plan.name}</strong> · 매달 {plan.debit_day}일 {formatWon(plan.monthly_amount)} · 만기 {plan.maturity_date}{!plan.active && ' · 중지'}</span>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleTogglePlan(plan)}>{plan.active ? '중지' : '다시 시작'}</button>
+          </div>
+        ))}
+        <form className="savings-form" onSubmit={handleAddPlan}>
+          <div className="field"><label htmlFor="savings-name">적금 이름</label><input id="savings-name" value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="예: 여행 적금" maxLength={80} required /></div>
+          <div className="field"><label htmlFor="savings-amount">매달 납입액</label><input id="savings-amount" type="number" min="1" value={planAmount} onChange={(e) => setPlanAmount(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="savings-day">매달 납입일</label><input id="savings-day" type="number" min="1" max="31" value={planDay} onChange={(e) => setPlanDay(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="savings-start">첫 납입월</label><input id="savings-start" type="month" min={monthStr()} value={planStartMonth} onChange={(e) => setPlanStartMonth(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="savings-maturity">만기일</label><input id="savings-maturity" type="date" min={`${planStartMonth}-01`} value={planMaturity} onChange={(e) => setPlanMaturity(e.target.value)} required /></div>
+          <button className="btn btn-primary" type="submit" disabled={savingPlan}>{savingPlan ? '등록 중...' : '적금 추가'}</button>
+        </form>
+        {planMessage && <div className="hint-text" role="status">{planMessage}</div>}
       </div>
 
       {overRows.length > 0 && (
@@ -93,46 +280,23 @@ export default function Budget() {
       )}
 
       <div className="card">
-        <div className="section-title">전체 월 예산</div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <input
-            type="number"
-            min="0"
-            placeholder="전체 예산 금액"
-            style={{ flex: 1, minWidth: 0, border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}
-            value={draftValue('overall', overallBudget?.limit_amount)}
-            onChange={(e) => setDrafts((d) => ({ ...d, overall: e.target.value }))}
-          />
-          <button
-            className="btn btn-primary"
-            disabled={savingKey === 'overall'}
-            onClick={() => handleSave(null, 'overall')}
-          >
-            저장
-          </button>
-        </div>
-        {overallBudget && (
-          <BudgetProgressBar spent={spentByCategory.total} limit={Number(overallBudget.limit_amount)} label="이번 달 전체 지출" />
-        )}
-      </div>
-
-      <div className="card">
         <div className="section-title">🎨 색칠 가계부</div>
         <ColoringGrid
           transactions={expenseTransactions}
-          overallLimit={overallBudget ? Number(overallBudget.limit_amount) : 0}
+          overallLimit={categoryBudgetTotal}
           spent={spentByCategory.total}
         />
       </div>
 
       <div className="card">
-        <div className="section-title">카테고리별 예산</div>
+        <div className="section-title">카테고리별 월 예산</div>
+        <div className="budget-category-grid">
         {expenseCategories.map((c) => {
           const b = categoryBudget(c.id)
           const spent = spentByCategory.map[c.id] || 0
           const key = c.id
           return (
-            <div key={c.id} style={{ marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+            <div key={c.id} className="budget-category-item">
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontWeight: 600 }}>
                   {c.icon} {c.name}
@@ -159,6 +323,7 @@ export default function Budget() {
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )

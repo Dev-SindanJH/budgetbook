@@ -3,13 +3,12 @@ export function formatWon(amount) {
   return n.toLocaleString('ko-KR') + '원'
 }
 
-export function todayStr() {
-  const d = new Date()
-  return d.toISOString().slice(0, 10)
+export function todayStr(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 export function monthStr(date = new Date()) {
-  return date.toISOString().slice(0, 7) // YYYY-MM
+  return todayStr(date).slice(0, 7)
 }
 
 export function addMonths(monthKey, delta) {

@@ -8,16 +8,28 @@ export function useTransactions(familyId, { from, to } = {}) {
   const refresh = useCallback(async () => {
     if (!familyId) return
     setLoading(true)
-    let query = supabase
-      .from('transactions')
-      .select('*, categories(id, name, icon, color, type), profiles(id, name, color)')
-      .eq('family_id', familyId)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-    if (from) query = query.gte('date', from)
-    if (to) query = query.lte('date', to)
-    const { data, error } = await query
-    if (!error) setTransactions(data || [])
+    const all = []
+    let offset = 0
+    let error = null
+    do {
+      let query = supabase
+        .from('transactions')
+        .select('*, categories(id, name, icon, color, type), profiles(id, name, color)')
+        .eq('family_id', familyId)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + 999)
+      if (from) query = query.gte('date', from)
+      if (to) query = query.lte('date', to)
+      const result = await query
+      error = result.error
+      if (error) break
+      all.push(...(result.data || []))
+      offset += result.data?.length || 0
+      if ((result.data?.length || 0) < 1000) break
+    } while (true)
+    if (!error) setTransactions(all)
     setLoading(false)
   }, [familyId, from, to])
 

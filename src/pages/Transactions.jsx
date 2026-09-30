@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext'
 import { useTransactions } from '../hooks/useTransactions'
 import { useCategories } from '../hooks/useCategories'
 import { useProfiles } from '../hooks/useProfiles'
+import { useCreditCards } from '../hooks/useCreditCards'
 import { addTransaction, updateTransaction, deleteTransaction } from '../lib/api'
-import { formatWon } from '../utils/format'
+import { formatWon, todayStr } from '../utils/format'
 import TransactionForm from '../components/TransactionForm'
 
 const PERIODS = [
@@ -17,7 +18,8 @@ function periodRange(key) {
   const now = new Date()
   if (key === 'month') {
     const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-    return { from, to: undefined }
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    return { from, to: `${from.slice(0, 7)}-${String(lastDay).padStart(2, '0')}` }
   }
   if (key === 'prevMonth') {
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
@@ -36,6 +38,7 @@ export default function Transactions() {
   const { transactions, loading, refresh } = useTransactions(family?.id, range)
   const { categories } = useCategories(family?.id)
   const { members } = useProfiles(family?.id)
+  const { cards } = useCreditCards(family?.id)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -84,47 +87,71 @@ export default function Transactions() {
     await refresh()
   }
 
+  function openAddForm() {
+    setEditing(null)
+    setShowForm(true)
+  }
+
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">내역 관리</h1>
+        <button className="btn btn-primary transactions-desktop-add" onClick={openAddForm}>
+          + 내역 추가
+        </button>
       </div>
 
-      <div className="filter-bar">
-        {PERIODS.map((p) => (
-          <button
-            key={p.key}
-            className={'btn btn-sm' + (period === p.key ? ' btn-primary' : '')}
-            onClick={() => setPeriod(p.key)}
-          >
-            {p.label}
-          </button>
-        ))}
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-          <option value="all">전체</option>
-          <option value="income">수입</option>
-          <option value="expense">지출</option>
-        </select>
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-          <option value="all">전체 카테고리</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.icon} {c.name}
-            </option>
+      <div className="card transaction-filters">
+        <div className="period-buttons" aria-label="조회 기간">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              className={'btn btn-sm' + (period === p.key ? ' btn-primary' : '')}
+              onClick={() => setPeriod(p.key)}
+            >
+              {p.label}
+            </button>
           ))}
-        </select>
-        <select value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)}>
-          <option value="all">전체 작성자</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-        <input placeholder="메모/카테고리 검색" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="transaction-filter-fields">
+          <select aria-label="거래 구분" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="all">전체</option>
+            <option value="income">수입</option>
+            <option value="expense">지출</option>
+          </select>
+          <select aria-label="카테고리" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="all">전체 카테고리</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.icon} {c.name}
+              </option>
+            ))}
+          </select>
+          <select aria-label="작성자" value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)}>
+            <option value="all">전체 작성자</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+          <input aria-label="메모 또는 카테고리 검색" placeholder="메모/카테고리 검색" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
       </div>
 
-      {loading ? (
+      {!loading && <div className="transaction-result-count">내역 {filtered.length}건</div>}
+
+      {!loading && groups.length > 0 && (
+        <div className="transaction-table-heading" aria-hidden="true">
+          <span>내역</span>
+          <span>결제수단</span>
+          <span>작성자</span>
+          <span>금액 · 관리</span>
+        </div>
+      )}
+
+      <div className="transaction-list">
+        {loading ? (
         <div className="empty-state">불러오는 중...</div>
       ) : groups.length === 0 ? (
         <div className="empty-state">조건에 맞는 거래가 없어요</div>
@@ -133,23 +160,26 @@ export default function Transactions() {
           <div className="tx-date-group" key={date}>
             <div className="tx-date-header">{date}</div>
             {items.map((t) => (
-              <div className="tx-row" key={t.id}>
+              <div className="tx-row tx-row-list" key={t.id}>
                 <div className="tx-row-left">
                   <div className="tx-icon" style={{ background: (t.categories?.color || '#94a3b8') + '22' }}>
                     {t.categories?.icon || '💸'}
                   </div>
                   <div className="tx-info">
                     <div className="tx-category">{t.categories?.name || '미분류'}</div>
-                    <div className="tx-memo">{t.memo || t.payment_method}</div>
+                    <div className="tx-memo">{t.memo || t.payment_method}{t.savings_plan_id && (t.date > todayStr() ? ' · 납입 예정' : ' · 자동 등록')}{t.payment_method === '신용카드' && t.card_due_date && ` · ${t.card_due_date} 자동이체`}</div>
                     <div className="tx-meta">{t.profiles?.name}</div>
                   </div>
                 </div>
-                <div className="tx-row-right" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="tx-list-payment">{t.payment_method === '신용카드' ? `${t.payment_method} · ${cards.find((c) => c.id === t.card_id)?.nickname || '카드 미지정'}` : t.payment_method || '—'}</span>
+                <span className="tx-list-member">{t.profiles?.name || '—'}</span>
+                <div className="tx-row-right">
                   <div className={'tx-amount ' + t.type}>
                     {t.type === 'income' ? '+' : '-'}
                     {formatWon(t.amount)}
                   </div>
                   <div className="tx-actions">
+                    {!t.savings_plan_id && <>
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() => {
@@ -162,20 +192,20 @@ export default function Transactions() {
                     <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(t.id)}>
                       삭제
                     </button>
+                    </>}
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ))
-      )}
+        )}
+      </div>
 
       <button
-        className="fab"
-        onClick={() => {
-          setEditing(null)
-          setShowForm(true)
-        }}
+        className="fab transactions-mobile-add"
+        aria-label="내역 추가"
+        onClick={openAddForm}
       >
         +
       </button>
@@ -183,6 +213,7 @@ export default function Transactions() {
       {showForm && (
         <TransactionForm
           categories={categories}
+          cards={cards}
           members={members}
           currentMemberId={profile?.id}
           initial={editing}
