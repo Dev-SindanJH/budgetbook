@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 export function useTransactions(familyId, { from, to } = {}) {
@@ -33,6 +33,12 @@ export function useTransactions(familyId, { from, to } = {}) {
     setLoading(false)
   }, [familyId, from, to])
 
+  const refreshRef = useRef(refresh)
+
+  useEffect(() => {
+    refreshRef.current = refresh
+  }, [refresh])
+
   useEffect(() => {
     refresh()
   }, [refresh])
@@ -44,13 +50,13 @@ export function useTransactions(familyId, { from, to } = {}) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'transactions', filter: `family_id=eq.${familyId}` },
-        () => refresh(),
+        () => refreshRef.current(),
       )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [familyId, refresh])
+  }, [familyId])
 
   return { transactions, loading, refresh }
 }
