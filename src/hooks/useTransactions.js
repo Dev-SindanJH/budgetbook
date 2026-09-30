@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+let nextTransactionChannelId = 0
+
 export function useTransactions(familyId, { from, to } = {}) {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +48,7 @@ export function useTransactions(familyId, { from, to } = {}) {
   useEffect(() => {
     if (!familyId) return
     const channel = supabase
-      .channel(`transactions-${familyId}`)
+      .channel(`transactions-${familyId}-${++nextTransactionChannelId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'transactions', filter: `family_id=eq.${familyId}` },
