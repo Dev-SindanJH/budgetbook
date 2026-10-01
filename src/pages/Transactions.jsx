@@ -1,3 +1,4 @@
+import Money from '../components/Money'
 import { useSearchParams } from 'react-router-dom'
 import { useUI } from '../context/UIContext'
 import DashboardCalendar from '../components/DashboardCalendar'
@@ -15,7 +16,6 @@ import {
   deleteTransaction,
 } from '../lib/api'
 import {
-  formatWon,
   todayStr,
   monthStr,
   monthLabel,
@@ -301,7 +301,7 @@ export default function Transactions() {
                       <div className="tx-row-right">
                         <div className={'tx-amount ' + t.type}>
                           {t.type === 'income' ? '+' : '-'}
-                          {formatWon(t.amount)}
+                          <Money amount={t.amount} />
                         </div>
                         <div className="tx-actions">
                           {!t.savings_plan_id && !t.loan_id && (

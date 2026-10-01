@@ -1,3 +1,4 @@
+import Money from '../components/Money'
 import { useMemo, useState } from 'react'
 import {
   BarChart,
@@ -16,7 +17,6 @@ import { useAuth } from '../context/AuthContext'
 import { useTransactions } from '../hooks/useTransactions'
 import { useProfiles } from '../hooks/useProfiles'
 import {
-  formatWon,
   addMonths,
   monthStr,
   monthLabel,
@@ -181,11 +181,9 @@ export default function Statistics() {
           <strong className="summary-value">
             {loading
               ? '확인 중…'
-              : formatWon(
-                  periodTx
+              : <Money amount={periodTx
                     .filter((t) => t.type === 'expense')
-                    .reduce((s, t) => s + Number(t.amount), 0),
-                )}
+                    .reduce((s, t) => s + Number(t.amount), 0)} />}
           </strong>
         </div>
         <div className="card summary-card">
@@ -193,11 +191,9 @@ export default function Statistics() {
           <strong className="summary-value income">
             {loading
               ? '확인 중…'
-              : formatWon(
-                  periodTx
+              : <Money amount={periodTx
                     .filter((t) => t.type === 'income')
-                    .reduce((s, t) => s + Number(t.amount), 0),
-                )}
+                    .reduce((s, t) => s + Number(t.amount), 0)} />}
           </strong>
         </div>
         <div className="card summary-card">
@@ -207,7 +203,7 @@ export default function Statistics() {
           </strong>
           <span className="hint-text">
             {!loading && donutData[0]
-              ? formatWon(donutData[0].value)
+              ? <Money amount={donutData[0].value} />
               : '기록이 쌓이면 알려드릴게요'}
           </span>
         </div>
@@ -236,7 +232,7 @@ export default function Statistics() {
                     tickFormatter={(v) => (v / 10000).toFixed(0) + '만'}
                   />
                   <YAxis type="category" dataKey="name" width={70} />
-                  <Tooltip formatter={(v) => formatWon(v)} />
+                  <Tooltip formatter={(v) => <Money amount={v} />} />
                   <Bar name="지출" dataKey="amount" radius={[0, 6, 6, 0]}>
                     {rankingData.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
@@ -258,7 +254,7 @@ export default function Statistics() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis tickFormatter={(v) => (v / 10000).toFixed(0) + '만'} />
-                <Tooltip formatter={(v) => formatWon(v)} />
+                <Tooltip formatter={(v) => <Money amount={v} />} />
                 <Legend />
                 <Line
                   type="monotone"
@@ -288,7 +284,7 @@ export default function Statistics() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis tickFormatter={(v) => (v / 10000).toFixed(0) + '만'} />
-                  <Tooltip formatter={(v) => formatWon(v)} />
+                  <Tooltip formatter={(v) => <Money amount={v} />} />
                   <Bar dataKey="amount" fill="#718df2" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

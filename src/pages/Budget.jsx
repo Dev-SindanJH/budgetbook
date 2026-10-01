@@ -1,3 +1,5 @@
+import MoneyInput from '../components/MoneyInput'
+import Money from '../components/Money'
 import { useSearchParams } from 'react-router-dom'
 import { useUI } from '../context/UIContext'
 import Modal from '../components/Modal'
@@ -22,7 +24,7 @@ import {
   deleteStockHolding,
 } from '../lib/api'
 import {
-  formatWon,
+  formatWonWithReading,
   monthStr,
   todayStr,
 } from '../utils/format'
@@ -466,7 +468,7 @@ export default function Budget() {
         <div>
           <span className="summary-label">가족 전체 · 총 보유 자산</span>
           <div className="summary-value">
-            {assetsLoading ? '확인 중…' : transactionsError || cashAssetsError || plansError || stocksError ? '일부 조회 실패' : formatWon(totalAssets)}
+            {assetsLoading ? '확인 중…' : transactionsError || cashAssetsError || plansError || stocksError ? '일부 조회 실패' : <Money amount={totalAssets} />}
           </div>
           <span className="hint-text">
             현금 + 적금 납입액 + 확인된 주식 평가액
@@ -481,30 +483,28 @@ export default function Budget() {
           <div>
             <span>현금</span>
             <strong>
-              {formatWon(cashAssetTotal)}
+              <Money amount={cashAssetTotal} />
             </strong>
           </div>
           <div>
             <span>적금 납입액</span>
-            <strong>{formatWon(savingsValue)}</strong>
+            <strong><Money amount={savingsValue} /></strong>
           </div>
           <div>
             <span>주식 평가액</span>
             <strong>
               {missingCount && missingCount === holdings.length
                 ? '시세 미확인'
-                : formatWon(stockValue)}
+                : <Money amount={stockValue} />}
             </strong>
           </div>
           <div>
             <span>등록 대출 원금 · 자산과 별도</span>
             <strong>
-              {formatWon(
-                loans.reduce(
+              <Money amount={loans.reduce(
                   (sum, loan) => sum + Number(loan.principal_amount),
                   0,
-                ),
-              )}
+                )} />
             </strong>
           </div>
         </div>
@@ -526,7 +526,7 @@ export default function Budget() {
         <div className="card">
           <div className="section-title">보유 현금 항목</div>
           <div className="summary-value" style={{ marginBottom: 8 }}>
-            {formatWon(cashAssetTotal)}
+            <Money amount={cashAssetTotal} />
           </div>
           <div className="hint-text" style={{ marginBottom: 12 }}>
             통장과 현금을 보유처별로 등록해요. 새 수입·지출은 선택한 보유처에 반영돼요. 기존 거래는 현재 잔액에 포함되어 다시 반영하지 않아요.
@@ -540,7 +540,7 @@ export default function Budget() {
             <div className="settings-list-item" key={asset.id}>
               <div>
                 <strong>{asset.name}</strong>
-                <div className="hint-text">{formatWon(asset.balance)}</div>
+                <div className="hint-text"><Money amount={asset.balance} /></div>
               </div>
               <div className="stock-holding-actions">
                 <button
@@ -603,11 +603,11 @@ export default function Budget() {
                 <div className="field">
                   <label htmlFor="cash-asset-amount">금액 (원)</label>
                   <span className="hint-text">현재 잔액을 입력해주세요. 이전 거래를 다시 더하거나 빼지 않아요.</span>
-                  <input
+                  <MoneyInput
                     id="cash-asset-amount"
-                    type="number"
                     value={cashAssetAmount}
-                    onChange={(e) => setCashAssetAmount(e.target.value)}
+                    onValueChange={setCashAssetAmount}
+                    allowNegative
                     required
                   />
                 </div>
@@ -662,10 +662,10 @@ export default function Budget() {
           </div>
           <div className="summary-value" style={{ marginBottom: 8 }}>
             {holdings.length === 0
-              ? formatWon(0)
+              ? <Money amount={0} />
               : missingCount === holdings.length
                 ? '시세 조회 전'
-                : formatWon(stockValue)}
+                : <Money amount={stockValue} />}
           </div>
           <div className="hint-text" style={{ marginBottom: 12 }}>
             KRX의 최근 제공 종가 × 보유 수량으로 평가해요. 현금 잔액에는
@@ -700,16 +700,14 @@ export default function Budget() {
                   <div className="hint-text">
                     {Number(stock.quantity).toLocaleString('ko-KR')}주
                     {quote
-                      ? ` × ${formatWon(quote.closing_price)} · ${quote.price_date} 종가`
+                      ? ` × ${formatWonWithReading(quote.closing_price)} · ${quote.price_date} 종가`
                       : ' · 시세 없음'}
                   </div>
                 </div>
                 <div className="stock-holding-actions">
                   <strong>
                     {quote
-                      ? formatWon(
-                          Number(stock.quantity) * Number(quote.closing_price),
-                        )
+                      ? <Money amount={Number(stock.quantity) * Number(quote.closing_price)} />
                       : '—'}
                   </strong>
                   <button
@@ -849,7 +847,7 @@ export default function Budget() {
                 <div>
                   <div>
                     <strong>{plan.name}</strong> · 매달 {plan.debit_day}일{' '}
-                    {formatWon(plan.monthly_amount)} ·{' '}
+                    <Money amount={plan.monthly_amount} /> ·{' '}
                     {plan.maturity_date
                       ? `만기 ${plan.maturity_date}`
                       : '만기 없음'}
@@ -862,15 +860,15 @@ export default function Budget() {
                         ? '총 납입 금액'
                         : '만기까지 납입 예정'}{' '}
                       <strong>
-                        {total === null ? '미정' : formatWon(total)}
+                        {total === null ? '미정' : <Money amount={total} />}
                       </strong>
                     </span>
                     <span>
-                      현재까지 납입된 금액 <strong>{formatWon(paid)}</strong>
+                      현재까지 납입된 금액 <strong><Money amount={paid} /></strong>
                     </span>
                     {remaining !== null && (
                       <span>
-                        남은 납입 금액 <strong>{formatWon(remaining)}</strong>
+                        남은 납입 금액 <strong><Money amount={remaining} /></strong>
                       </span>
                     )}
                   </div>
@@ -940,12 +938,11 @@ export default function Budget() {
                 </div>
                 <div className="field">
                   <label htmlFor="savings-amount">매달 납입액</label>
-                  <input
+                  <MoneyInput
                     id="savings-amount"
-                    type="number"
                     min="1"
                     value={planAmount}
-                    onChange={(e) => setPlanAmount(e.target.value)}
+                    onValueChange={setPlanAmount}
                     required
                   />
                 </div>
@@ -1038,7 +1035,7 @@ export default function Budget() {
             <div className="settings-list-item" key={loan.id}>
               <span>
                 <strong>{loan.name}</strong> ·{' '}
-                {formatWon(loan.principal_amount)} · 연{' '}
+                <Money amount={loan.principal_amount} /> · 연{' '}
                 {Number(loan.annual_interest_rate)}% · 매달 {loan.interest_day}
                 일 {loan.payment_method === '현금' ? '현금' : '카드'} · 상환{' '}
                 {loan.repayment_date}
@@ -1129,13 +1126,11 @@ export default function Budget() {
                 </div>
                 <div className="field">
                   <label htmlFor="loan-amount">대출금액</label>
-                  <input
+                  <MoneyInput
                     id="loan-amount"
-                    type="number"
                     min="1"
-                    step="1"
                     value={loanAmount}
-                    onChange={(e) => setLoanAmount(e.target.value)}
+                    onValueChange={setLoanAmount}
                     required
                   />
                 </div>

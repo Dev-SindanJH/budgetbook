@@ -1,5 +1,5 @@
+import Money from './Money'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
-import { formatWon } from '../utils/format'
 
 export default function CategoryDonutChart({ data, showLegend = true, height }) {
   const total = data.reduce((sum, d) => sum + d.value, 0)
@@ -25,7 +25,7 @@ export default function CategoryDonutChart({ data, showLegend = true, height }) 
                 <Cell key={i} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip formatter={(value) => formatWon(value)} />
+            <Tooltip formatter={(value) => <Money amount={value} />} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -36,7 +36,7 @@ export default function CategoryDonutChart({ data, showLegend = true, height }) 
               <span className="legend-dot" style={{ background: d.color }} />
               <span className="legend-name">{d.name}</span>
               <span className="hint-text">{Math.round((d.value / total) * 100)}%</span>
-              <span className="legend-amount">{formatWon(d.value)}</span>
+              <span className="legend-amount"><Money amount={d.value} /></span>
             </div>
           ))}
         </div>

@@ -3,6 +3,32 @@ export function formatWon(amount) {
   return n.toLocaleString('ko-KR') + '원'
 }
 
+export function formatKoreanWon(amount) {
+  const n = Number(amount) || 0
+  if (!Number.isFinite(n)) return '0원'
+  const [integer, fraction] = Math.abs(n).toLocaleString('en-US', {
+    useGrouping: false,
+    maximumFractionDigits: 3,
+  }).split('.')
+  const units = ['', '만', '억', '조', '경', '해']
+  const parts = []
+  for (let end = integer.length, unit = 0; end > 0; end -= 4, unit++) {
+    const group = Number(integer.slice(Math.max(0, end - 4), end))
+    if (unit === 0 && fraction) parts.unshift(`${group}.${fraction}`)
+    else if (group) parts.unshift(`${group}${units[unit] || ''}`)
+  }
+  return `${n < 0 ? '-' : ''}${parts.join(' ') || '0'}원`
+}
+
+export function formatWonWithReading(amount) {
+  return `${formatWon(amount)} (${formatKoreanWon(amount)})`
+}
+
+// Keep the editable value as a string so commas never enter saved amounts.
+export function formatMoneyInput(value) {
+  return String(value ?? '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
 export function todayStr(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }

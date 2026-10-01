@@ -1090,7 +1090,7 @@ input[type='checkbox'] {
   gap: 12px;
   font-size: 13px;
 }
-.asset-overview-detail span {
+.asset-overview-detail > div > span {
   color: var(--text-muted);
 }
 .credit-card-form,
@@ -2017,6 +2017,48 @@ input[type='checkbox'] {
 .hero-amount.amount-long {
   font-size: clamp(20px, 5.8vw, 34px);
   letter-spacing: -0.8px;
+}
+
+.money {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.money .money-number {
+  color: inherit;
+}
+.money .money-reading,
+.money-input-reading {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.money-input-reading {
+  color: var(--primary-dark);
+  font-size: 13px;
+}
+.hero-amount .money-reading,
+.asset-overview .summary-value .money-reading {
+  font-size: 14px;
+}
+.tx-amount,
+.legend-amount,
+.asset-overview-detail strong {
+  text-align: right;
+}
+.calendar-expense,
+.calendar-income {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 @media (min-width: 801px) {
   .settings-grid {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { formatShortWon } from '../utils/format'
+import { formatKoreanWon, formatWonWithReading } from '../utils/format'
 
 const UNIT = 10000
 const COLUMNS = 10
@@ -142,8 +142,9 @@ export default function ColoringGrid({ transactions, spent }) {
           textColor: item.textColor,
           label:
             i === labelBlockIndex
-              ? `${item.label} ${formatShortWon(item.amount)}`
+              ? `${item.label} ${formatKoreanWon(item.amount)}`
               : null,
+          description: `${item.label} ${formatWonWithReading(item.amount)}`,
         })
       })
     }
@@ -176,6 +177,7 @@ export default function ColoringGrid({ transactions, spent }) {
           <div
             key={b.key}
             className="coloring-run"
+            title={b.description}
             style={{
               gridColumn: `${b.startCol + 1} / span ${b.length}`,
               gridRow: `${b.row + 1} / span ${b.rowSpan}`,

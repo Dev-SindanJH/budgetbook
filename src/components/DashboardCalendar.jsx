@@ -1,5 +1,6 @@
+import Money from './Money'
 import { useMemo, useState } from 'react'
-import { formatShortWon, formatWon, todayStr } from '../utils/format'
+import { formatKoreanWon, formatWonWithReading, todayStr } from '../utils/format'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -54,7 +55,7 @@ export default function DashboardCalendar({ month, transactions }) {
           return (
             <button
               key={dateStr}
-              aria-label={`${dateStr}${data ? `, 지출 ${formatWon(data.expense)}, 수입 ${formatWon(data.income)}` : ', 내역 없음'}`}
+              aria-label={`${dateStr}${data ? `, 지출 ${formatWonWithReading(data.expense)}, 수입 ${formatWonWithReading(data.income)}` : ', 내역 없음'}`}
               aria-pressed={dateStr === activeDate}
               type="button"
               className={
@@ -69,12 +70,12 @@ export default function DashboardCalendar({ month, transactions }) {
               <span className="calendar-day-num">{dayNum}</span>
               {data?.expense > 0 && (
                 <span className="calendar-expense">
-                  -{formatShortWon(data.expense)}
+                  -{formatKoreanWon(data.expense)}
                 </span>
               )}
               {data?.income > 0 && (
                 <span className="calendar-income">
-                  +{formatShortWon(data.income)}
+                  +{formatKoreanWon(data.income)}
                 </span>
               )}
             </button>
@@ -109,7 +110,7 @@ export default function DashboardCalendar({ month, transactions }) {
                 </div>
                 <div className={'tx-amount ' + t.type}>
                   {t.type === 'income' ? '+' : '-'}
-                  {formatWon(t.amount)}
+                  <Money amount={t.amount} />
                 </div>
               </div>
             ))

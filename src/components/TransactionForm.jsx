@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import { useEffect, useState } from 'react'
 import { todayStr, monthLabel } from '../utils/format'
 import { creditCardDueDate } from '../utils/creditCards'
@@ -136,16 +137,13 @@ export default function TransactionForm({
 
         <div className="field amount-field">
           <label htmlFor="transaction-amount">금액 (원)</label>
-          <input
+          <MoneyInput
             id="transaction-amount"
             className="amount-input"
-            type="number"
-            inputMode="numeric"
             min="1"
-            step="1"
             placeholder="0"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onValueChange={setAmount}
             required
             data-autofocus
           />

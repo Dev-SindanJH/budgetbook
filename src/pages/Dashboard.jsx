@@ -1,3 +1,4 @@
+import Money from '../components/Money'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -13,7 +14,7 @@ import { useCashAssets } from '../hooks/useCashAssets'
 import { useStockHoldings } from '../hooks/useStockHoldings'
 import { addTransaction } from '../lib/api'
 import {
-  formatWon,
+  formatWonWithReading,
   monthStr,
   monthRange,
   monthLabel,
@@ -227,7 +228,7 @@ export default function Dashboard() {
           </div>
           <div className="hero-label">이번 달 지출</div>
           <div className={`hero-amount${expense >= 10000000000 ? ' amount-long' : ''}`}>
-            {ready ? formatWon(expense) : '확인 중…'}
+            {ready ? <Money amount={expense} /> : '확인 중…'}
           </div>
           <p className="hero-description">{!ready ? '이번 달 기록을 정리하고 있어요.' : member !== 'all' ? '선택한 구성원의 지출이에요.' : '이번 달 우리 집의 지출을 확인해보세요.'}</p>
           <div className="hero-actions">
@@ -269,12 +270,12 @@ export default function Dashboard() {
             </div>
             <div className="flow-row">
               <span>지출</span>
-              <strong>{loading ? '—' : formatWon(expense)}</strong>
+              <strong>{loading ? '—' : <Money amount={expense} />}</strong>
             </div>
             <div className="flow-row">
               <span>수입</span>
               <strong className="income-text">
-                {loading ? '—' : formatWon(income)}
+                {loading ? '—' : <Money amount={income} />}
               </strong>
             </div>
             <div className="flow-footer">
@@ -287,7 +288,7 @@ export default function Dashboard() {
                     : '지난달보다 '}
                   {difference === 0
                     ? '같은 금액을 썼어요'
-                    : formatWon(Math.abs(difference)) +
+                    : formatWonWithReading(Math.abs(difference)) +
                       (difference > 0 ? ' 더 썼어요' : ' 덜 썼어요')}
                 </span>
               ) : (
@@ -310,7 +311,7 @@ export default function Dashboard() {
                 {loading
                   ? '확인 중…'
                   : dueGroups[0]
-                    ? formatWon(dueGroups[0].amount)
+                    ? <Money amount={dueGroups[0].amount} />
                     : '예정된 결제가 없어요'}
               </span>
               <span className="hint-text">
@@ -336,7 +337,7 @@ export default function Dashboard() {
               ? '확인 중…'
               : transactionsError || cashError || plansError || stockError
                 ? '일부 조회 실패'
-                : formatWon(totalAssets)}
+                : <Money amount={totalAssets} />}
             <Icon name="right" size={18} />
           </span>
           {!assetsLoading && missingCount > 0 && (
@@ -391,7 +392,7 @@ export default function Dashboard() {
                   </div>
                   <div className={`tx-amount ${t.type}`}>
                     {t.type === 'income' ? '+' : '−'}
-                    {formatWon(t.amount)}
+                    <Money amount={t.amount} />
                   </div>
                 </div>
               ))
@@ -420,7 +421,7 @@ export default function Dashboard() {
                   ? '확인 중…'
                   : cashError || transactionsError
                     ? '조회 실패'
-                    : formatWon(cashValue)}
+                    : <Money amount={cashValue} />}
               </strong>
             </div>
           )}
@@ -451,11 +452,9 @@ export default function Dashboard() {
                   <div className="flow-row" key={m.id}>
                     <span>{m.name}</span>
                     <strong>
-                      {formatWon(
-                        expenseTransactions
+                      <Money amount={expenseTransactions
                           .filter((t) => t.member_id === m.id)
-                          .reduce((s, t) => s + Number(t.amount), 0),
-                      )}
+                          .reduce((s, t) => s + Number(t.amount), 0)} />
                     </strong>
                   </div>
                 ))}
@@ -490,7 +489,7 @@ export default function Dashboard() {
             <section className="due-group" key={g.date}>
               <div className="flow-row">
                 <strong>{g.date}</strong>
-                <strong>{formatWon(g.amount)}</strong>
+                <strong><Money amount={g.amount} /></strong>
               </div>
               {g.items.map((t) => (
                 <div className="due-item" key={t.id}>
@@ -501,14 +500,14 @@ export default function Dashboard() {
                       {t.memo || t.categories?.name} · {t.profiles?.name}
                     </small>
                   </span>
-                  <strong>{formatWon(t.amount)}</strong>
+                  <strong><Money amount={t.amount} /></strong>
                 </div>
               ))}
             </section>
           ))}
           <div className="payment-explainer">
             {monthLabel(month)} 예상 현금 흐름{' '}
-            <strong>{formatWon(cashFlow)}</strong>
+            <strong><Money amount={cashFlow} /></strong>
             <br />
             수입 − 즉시 지출 − 해당 월 카드 결제액. 보유 현금 잔액과는 달라요.
           </div>

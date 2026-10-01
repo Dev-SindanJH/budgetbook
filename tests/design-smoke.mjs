@@ -115,6 +115,7 @@ async function close() {
 try {
   await go()
   await page.locator('.hero-amount').getByText('650,000원', { exact: true }).waitFor()
+  await page.locator('.hero-amount').getByText('65만원', { exact: true }).waitFor()
   const expectedSavings = (new Date().getMonth() + 1) * 200000
   const expectedAssets = (6250000 + 1560000 + expectedSavings).toLocaleString('ko-KR') + '원'
   await page.locator('.asset-strip-value').getByText(expectedAssets, { exact: true }).waitFor()
@@ -126,7 +127,33 @@ try {
     await page.locator(':focus').getAttribute('id'),
     'transaction-amount',
   )
-  await page.getByLabel('금액 (원)').fill('18000')
+  const moneyInput = page.getByLabel('금액 (원)')
+  await moneyInput.pressSequentially('123958230')
+  assert.equal(await moneyInput.inputValue(), '123,958,230')
+  await page.getByText('1억 2395만 8230원', { exact: true }).waitFor()
+  // A paste with commas, replacement in the middle, and separator deletion.
+  await moneyInput.fill('123,958,230')
+  await moneyInput.evaluate((input) => input.setSelectionRange(4, 7))
+  await page.keyboard.type('111')
+  assert.equal(await moneyInput.inputValue(), '123,111,230')
+  assert.equal(await moneyInput.evaluate((input) => input.selectionStart), 7)
+  await moneyInput.fill('1,234')
+  await moneyInput.evaluate((input) => input.setSelectionRange(2, 2))
+  await page.keyboard.press('Backspace')
+  assert.equal(await moneyInput.inputValue(), '234')
+  await moneyInput.fill('1,234')
+  await moneyInput.evaluate((input) => input.setSelectionRange(1, 1))
+  await page.keyboard.press('Delete')
+  assert.equal(await moneyInput.inputValue(), '134')
+  await moneyInput.fill('')
+  assert.equal(await moneyInput.inputValue(), '')
+  await moneyInput.fill('0')
+  assert.equal(await moneyInput.evaluate((input) => input.checkValidity()), false)
+  await moneyInput.fill('9007199254740992')
+  assert.equal(await moneyInput.evaluate((input) => input.checkValidity()), false)
+  await moneyInput.fill('18000')
+  assert.equal(await moneyInput.inputValue(), '18,000')
+  await page.getByText('1만 8000원', { exact: true }).waitFor()
   await page.getByLabel('결제수단', { exact: true }).selectOption('신용카드')
   await page.getByLabel('사용한 신용카드').selectOption('card-1')
   await page.getByLabel('카드 결제대금 출금 보유처').selectOption('cash-1')
@@ -137,7 +164,7 @@ try {
   })
   await page.getByRole('button', { name: '기록하기', exact: true }).click()
   await page.getByRole('alert').waitFor()
-  assert.equal(await page.getByLabel('금액 (원)').inputValue(), '18000')
+  assert.equal(await page.getByLabel('금액 (원)').inputValue(), '18,000')
   await page.evaluate(() => {
     window.__failSave = false
   })
@@ -150,6 +177,7 @@ try {
     2,
   )
   assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].cash_asset_id), 'cash-1')
+  assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].amount), 18000)
   assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].cash_balance_included), true)
   await page.getByRole('button', { name: '수입 기록', exact: true }).click()
   await page.getByLabel('금액 (원)').fill('100000')
@@ -210,7 +238,17 @@ try {
     await page.evaluate(() => { window.__failSave = true })
     await dialog.getByRole('button', { name: submit, exact: true }).click()
     await dialog.getByText('테스트: 저장에 실패했어요. 다시 시도해주세요.', { exact: true }).waitFor()
-    for (const [label, value] of Object.entries(fields)) assert.equal(await dialog.getByLabel(label, { exact: true }).inputValue(), value)
+    for (const [label, value] of Object.entries(fields)) {
+      const money = ['금액 (원)', '매달 납입액', '대출금액'].includes(label)
+      assert.equal(await dialog.getByLabel(label, { exact: true }).inputValue(), money ? Number(value).toLocaleString('ko-KR') : value)
+    }
+    if (tab === 'cash') {
+      await dialog.getByLabel('금액 (원)', { exact: true }).fill('-123958230')
+      assert.equal(await dialog.getByLabel('금액 (원)', { exact: true }).inputValue(), '-123,958,230')
+      await dialog.getByText('-1억 2395만 8230원', { exact: true }).waitFor()
+      await dialog.getByLabel('금액 (원)', { exact: true }).fill('200000')
+    }
+    if (tab !== 'stocks') await dialog.locator('.money-input-reading').getByText(tab === 'cash' ? '20만원' : tab === 'loans' ? '100만원' : '10만원', { exact: true }).waitFor()
     await page.setViewportSize({ width: 320, height: 844 })
     await noOverflow(`320 ${tab} modal`)
     await shot(`mobile-modal-${tab}`)
@@ -218,6 +256,11 @@ try {
     await dialog.getByRole('button', { name: submit, exact: true }).click()
     await dialog.waitFor({ state: 'detached' })
     assert.equal(await page.evaluate((name) => window.__calls.filter((c) => c.name === name).length, apiName), 2)
+    if (tab !== 'stocks') {
+      const payload = await page.evaluate(() => window.__calls.at(-1).args[0])
+      assert.equal(tab === 'cash' ? payload.amount : tab === 'loans' ? payload.principal_amount : payload.monthly_amount,
+        tab === 'cash' ? 200000 : tab === 'loans' ? 1000000 : 100000)
+    }
     await page.setViewportSize({ width: 1440, height: 1050 })
     await page
       .getByRole('button', { name: '삭제', exact: true })
