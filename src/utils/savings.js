@@ -1,5 +1,5 @@
 function installmentsThrough(plan, date) {
-  const endDate = date < plan.maturity_date ? date : plan.maturity_date
+  const endDate = !plan.maturity_date || date < plan.maturity_date ? date : plan.maturity_date
   if (endDate < plan.start_month) return 0
 
   const [startYear, startMonth] = plan.start_month.slice(0, 7).split('-').map(Number)
@@ -12,7 +12,7 @@ function installmentsThrough(plan, date) {
 
 export function savingsAmounts(plan, today) {
   const monthlyAmount = Number(plan.monthly_amount)
-  const total = installmentsThrough(plan, plan.maturity_date) * monthlyAmount
+  const total = plan.maturity_date ? installmentsThrough(plan, plan.maturity_date) * monthlyAmount : null
   const paid = installmentsThrough(plan, today) * monthlyAmount
-  return { total, paid, remaining: total - paid }
+  return { total, paid, remaining: total === null ? null : total - paid }
 }

@@ -8,7 +8,7 @@ import { useCashAssets } from '../hooks/useCashAssets'
 import { useSavingsPlans } from '../hooks/useSavingsPlans'
 import { useLoans } from '../hooks/useLoans'
 import { useStockHoldings } from '../hooks/useStockHoldings'
-import { upsertBudget, saveCashSettings, saveCashAsset, deleteCashAsset, addSavingsPlan, updateSavingsPlan, addLoan, updateLoan, saveStockHolding, deleteStockHolding } from '../lib/api'
+import { upsertBudget, saveCashSettings, saveCashAsset, deleteCashAsset, addSavingsPlan, updateSavingsPlan, deleteSavingsPlan, addLoan, updateLoan, deleteLoan, saveStockHolding, deleteStockHolding } from '../lib/api'
 import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
 import { recordedCashBalance } from '../utils/creditCards'
 import { savingsAmounts } from '../utils/savings'
@@ -45,6 +45,7 @@ export default function Budget() {
   const [planDay, setPlanDay] = useState('1')
   const [planStartMonth, setPlanStartMonth] = useState(monthStr())
   const [planMaturity, setPlanMaturity] = useState('')
+  const [editingPlanId, setEditingPlanId] = useState(null)
   const [planMessage, setPlanMessage] = useState('')
   const [savingPlan, setSavingPlan] = useState(false)
   const [loanName, setLoanName] = useState('')
@@ -54,6 +55,7 @@ export default function Budget() {
   const [loanRate, setLoanRate] = useState('')
   const [loanDay, setLoanDay] = useState('1')
   const [loanMethod, setLoanMethod] = useState('현금')
+  const [editingLoanId, setEditingLoanId] = useState(null)
   const [loanMessage, setLoanMessage] = useState('')
   const [savingLoan, setSavingLoan] = useState(false)
   const [stockSymbol, setStockSymbol] = useState('')
@@ -118,27 +120,51 @@ export default function Budget() {
     }
   }
 
-  async function handleAddPlan(e) {
+  async function handleSavePlan(e) {
     e.preventDefault()
     const amount = Number(planAmount)
     const day = Number(planDay)
-    if (!planName.trim() || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(day) || day < 1 || day > 31 || !planStartMonth || !planMaturity || planMaturity < `${planStartMonth}-01`) {
-      setPlanMessage('적금 이름, 월 납입액, 납입일, 첫 납입월과 만기를 확인해주세요')
+    if (!planName.trim() || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(day) || day < 1 || day > 31 || !planStartMonth || (planMaturity && planMaturity < `${planStartMonth}-01`)) {
+      setPlanMessage('적금 이름, 월 납입액, 납입일과 첫 납입월을 확인해주세요')
       return
     }
     setSavingPlan(true)
     setPlanMessage('')
     try {
-      await addSavingsPlan({ family_id: family.id, member_id: profile.id, name: planName.trim(), monthly_amount: amount, debit_day: day, start_month: `${planStartMonth}-01`, maturity_date: planMaturity })
+      const payload = { family_id: family.id, member_id: profile.id, name: planName.trim(), monthly_amount: amount, debit_day: day, start_month: `${planStartMonth}-01`, maturity_date: planMaturity || null }
+      if (editingPlanId) await updateSavingsPlan(editingPlanId, payload)
+      else await addSavingsPlan(payload)
       await Promise.all([refreshPlans(), refreshTransactions()])
       setPlanName('')
       setPlanAmount('')
-      setPlanMessage('적금과 납입 예정 지출을 등록했어요')
+      setPlanMaturity('')
+      setEditingPlanId(null)
+      setPlanMessage(editingPlanId ? '적금 정보를 수정했어요' : '적금과 납입 예정 지출을 등록했어요')
     } catch (err) {
       setPlanMessage(err.message || '적금을 등록하지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.')
     } finally {
       setSavingPlan(false)
     }
+  }
+
+  function handleEditPlan(plan) {
+    setEditingPlanId(plan.id)
+    setPlanName(plan.name)
+    setPlanAmount(String(plan.monthly_amount))
+    setPlanDay(String(plan.debit_day))
+    setPlanStartMonth(plan.start_month.slice(0, 7))
+    setPlanMaturity(plan.maturity_date || '')
+    setPlanMessage('')
+  }
+
+  async function handleDeletePlan(plan) {
+    if (!window.confirm(`'${plan.name}' 적금과 앞으로 예정된 납입을 삭제할까요?`)) return
+    try {
+      await deleteSavingsPlan(plan.id)
+      await Promise.all([refreshPlans(), refreshTransactions()])
+      if (editingPlanId === plan.id) setEditingPlanId(null)
+      setPlanMessage('적금과 앞으로 예정된 납입을 삭제했어요')
+    } catch (err) { setPlanMessage(err.message || '적금을 삭제하지 못했어요') }
   }
 
   async function handleTogglePlan(plan) {
@@ -151,7 +177,7 @@ export default function Budget() {
     }
   }
 
-  async function handleAddLoan(e) {
+  async function handleSaveLoan(e) {
     e.preventDefault()
     const amount = Number(loanAmount)
     const rate = Number(loanRate)
@@ -163,17 +189,42 @@ export default function Budget() {
     setSavingLoan(true)
     setLoanMessage('')
     try {
-      await addLoan({ family_id: family.id, member_id: profile.id, name: loanName.trim(), loan_date: loanDate, repayment_date: loanRepaymentDate, principal_amount: amount, annual_interest_rate: rate, interest_day: day, payment_method: loanMethod })
+      const payload = { family_id: family.id, member_id: profile.id, name: loanName.trim(), loan_date: loanDate, repayment_date: loanRepaymentDate, principal_amount: amount, annual_interest_rate: rate, interest_day: day, payment_method: loanMethod }
+      if (editingLoanId) await updateLoan(editingLoanId, payload)
+      else await addLoan(payload)
       await Promise.all([refreshLoans(), refreshTransactions()])
       setLoanName('')
       setLoanAmount('')
       setLoanRate('')
-      setLoanMessage('대출과 월 이자 지출을 등록했어요')
+      setEditingLoanId(null)
+      setLoanMessage(editingLoanId ? '대출 정보를 수정했어요' : '대출과 월 이자 지출을 등록했어요')
     } catch (err) {
       setLoanMessage(err.message || '대출을 등록하지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.')
     } finally {
       setSavingLoan(false)
     }
+  }
+
+  function handleEditLoan(loan) {
+    setEditingLoanId(loan.id)
+    setLoanName(loan.name)
+    setLoanDate(loan.loan_date)
+    setLoanRepaymentDate(loan.repayment_date)
+    setLoanAmount(String(loan.principal_amount))
+    setLoanRate(String(loan.annual_interest_rate))
+    setLoanDay(String(loan.interest_day))
+    setLoanMethod(loan.payment_method)
+    setLoanMessage('')
+  }
+
+  async function handleDeleteLoan(loan) {
+    if (!window.confirm(`'${loan.name}' 대출과 앞으로 예정된 이자 지출을 삭제할까요?`)) return
+    try {
+      await deleteLoan(loan.id)
+      await Promise.all([refreshLoans(), refreshTransactions()])
+      if (editingLoanId === loan.id) setEditingLoanId(null)
+      setLoanMessage('대출과 앞으로 예정된 이자 지출을 삭제했어요')
+    } catch (err) { setLoanMessage(err.message || '대출을 삭제하지 못했어요') }
   }
 
   async function handleToggleLoan(loan) {
@@ -356,23 +407,28 @@ export default function Budget() {
           const { total, paid, remaining } = savingsAmounts(plan, todayStr())
           return <div className="settings-list-item savings-plan-item" key={plan.id}>
             <div>
-              <div><strong>{plan.name}</strong> · 매달 {plan.debit_day}일 {formatWon(plan.monthly_amount)} · 만기 {plan.maturity_date}{!plan.active && ' · 중지'}</div>
+              <div><strong>{plan.name}</strong> · 매달 {plan.debit_day}일 {formatWon(plan.monthly_amount)} · {plan.maturity_date ? `만기 ${plan.maturity_date}` : '만기 없음'}{!plan.active && ' · 중지'}</div>
               <div className="savings-amounts">
-                <span>총 납입 금액 <strong>{formatWon(total)}</strong></span>
+                <span>{plan.maturity_date ? '총 납입 금액' : '만기까지 납입 예정'} <strong>{total === null ? '미정' : formatWon(total)}</strong></span>
                 <span>현재까지 납입된 금액 <strong>{formatWon(paid)}</strong></span>
-                <span>남은 납입 금액 <strong>{formatWon(remaining)}</strong></span>
+                {remaining !== null && <span>남은 납입 금액 <strong>{formatWon(remaining)}</strong></span>}
               </div>
             </div>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleTogglePlan(plan)}>{plan.active ? '중지' : '다시 시작'}</button>
+            <div className="stock-holding-actions">
+              <button type="button" className="btn btn-sm" onClick={() => handleEditPlan(plan)}>수정</button>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleTogglePlan(plan)}>{plan.active ? '중지' : '다시 시작'}</button>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleDeletePlan(plan)}>삭제</button>
+            </div>
           </div>
         })}
-        <form className="savings-form" onSubmit={handleAddPlan}>
+        <form className="savings-form" onSubmit={handleSavePlan}>
           <div className="field"><label htmlFor="savings-name">적금 이름</label><input id="savings-name" value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="예: 여행 적금" maxLength={80} required /></div>
           <div className="field"><label htmlFor="savings-amount">매달 납입액</label><input id="savings-amount" type="number" min="1" value={planAmount} onChange={(e) => setPlanAmount(e.target.value)} required /></div>
           <div className="field"><label htmlFor="savings-day">매달 납입일</label><input id="savings-day" type="number" min="1" max="31" value={planDay} onChange={(e) => setPlanDay(e.target.value)} required /></div>
           <div className="field"><label htmlFor="savings-start">첫 납입월</label><input id="savings-start" type="month" value={planStartMonth} onChange={(e) => setPlanStartMonth(e.target.value)} required /></div>
-          <div className="field"><label htmlFor="savings-maturity">만기일</label><input id="savings-maturity" type="date" min={`${planStartMonth}-01`} value={planMaturity} onChange={(e) => setPlanMaturity(e.target.value)} required /></div>
-          <button className="btn btn-primary" type="submit" disabled={savingPlan}>{savingPlan ? '등록 중...' : '적금 추가'}</button>
+          <div className="field"><label htmlFor="savings-maturity">만기일 (선택)</label><input id="savings-maturity" type="date" min={`${planStartMonth}-01`} value={planMaturity} onChange={(e) => setPlanMaturity(e.target.value)} /></div>
+          <button className="btn btn-primary" type="submit" disabled={savingPlan}>{savingPlan ? '저장 중...' : editingPlanId ? '적금 수정' : '적금 추가'}</button>
+          {editingPlanId && <button className="btn" type="button" onClick={() => { setEditingPlanId(null); setPlanName(''); setPlanAmount(''); setPlanMaturity('') }}>취소</button>}
         </form>
         {planMessage && <div className="hint-text" role="status">{planMessage}</div>}
       </div>
@@ -385,10 +441,14 @@ export default function Budget() {
         {loans.map((loan) => (
           <div className="settings-list-item" key={loan.id}>
             <span><strong>{loan.name}</strong> · {formatWon(loan.principal_amount)} · 연 {Number(loan.annual_interest_rate)}% · 매달 {loan.interest_day}일 {loan.payment_method === '현금' ? '현금' : '카드'} · 상환 {loan.repayment_date}{!loan.active && ' · 중지'}</span>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleToggleLoan(loan)}>{loan.active ? '중지' : '다시 시작'}</button>
+            <div className="stock-holding-actions">
+              <button type="button" className="btn btn-sm" onClick={() => handleEditLoan(loan)}>수정</button>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleToggleLoan(loan)}>{loan.active ? '중지' : '다시 시작'}</button>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleDeleteLoan(loan)}>삭제</button>
+            </div>
           </div>
         ))}
-        <form className="loan-form" onSubmit={handleAddLoan}>
+        <form className="loan-form" onSubmit={handleSaveLoan}>
           <div className="field"><label htmlFor="loan-name">대출 이름</label><input id="loan-name" value={loanName} onChange={(e) => setLoanName(e.target.value)} placeholder="예: 전세자금대출" maxLength={80} required /></div>
           <div className="field"><label htmlFor="loan-date">대출일</label><input id="loan-date" type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} required /></div>
           <div className="field"><label htmlFor="loan-repayment">상환일</label><input id="loan-repayment" type="date" min={loanDate} value={loanRepaymentDate} onChange={(e) => setLoanRepaymentDate(e.target.value)} required /></div>
@@ -396,7 +456,8 @@ export default function Budget() {
           <div className="field"><label htmlFor="loan-rate">연이율 (%)</label><input id="loan-rate" type="number" min="0" step="0.01" value={loanRate} onChange={(e) => setLoanRate(e.target.value)} required /></div>
           <div className="field"><label htmlFor="loan-day">매달 이자 납입일</label><input id="loan-day" type="number" min="1" max="31" value={loanDay} onChange={(e) => setLoanDay(e.target.value)} required /></div>
           <div className="field"><label htmlFor="loan-method">이자 납입 방식</label><select id="loan-method" value={loanMethod} onChange={(e) => setLoanMethod(e.target.value)}><option value="현금">현금</option><option value="신용카드">카드</option></select></div>
-          <button className="btn btn-primary" type="submit" disabled={savingLoan}>{savingLoan ? '등록 중...' : '대출 추가'}</button>
+          <button className="btn btn-primary" type="submit" disabled={savingLoan}>{savingLoan ? '저장 중...' : editingLoanId ? '대출 수정' : '대출 추가'}</button>
+          {editingLoanId && <button className="btn" type="button" onClick={() => { setEditingLoanId(null); setLoanName(''); setLoanAmount(''); setLoanRate('') }}>취소</button>}
         </form>
         {loanMessage && <div className="hint-text" role="status">{loanMessage}</div>}
       </div>

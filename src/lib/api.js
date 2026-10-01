@@ -53,6 +53,11 @@ export async function updateSavingsPlan(id, payload) {
   if (error) throw error
 }
 
+export async function deleteSavingsPlan(id) {
+  const { error } = await supabase.from('savings_plans').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function addLoan(payload) {
   const { error } = await supabase.from('loans').insert(payload)
   if (error) throw error
@@ -60,6 +65,11 @@ export async function addLoan(payload) {
 
 export async function updateLoan(id, payload) {
   const { error } = await supabase.from('loans').update(payload).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteLoan(id) {
+  const { error } = await supabase.from('loans').delete().eq('id', id)
   if (error) throw error
 }
 
