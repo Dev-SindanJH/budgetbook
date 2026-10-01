@@ -7,11 +7,11 @@ const GAP = 3
 const MAX_CELL_HEIGHT = 74
 const MIN_CELL_HEIGHT = 24
 const PALETTE = [
-  { bg: 'rgba(255, 190, 130, 0.68)', text: '#8a4a12' },
-  { bg: 'rgba(255, 226, 110, 0.68)', text: '#7a6300' },
-  { bg: 'rgba(150, 210, 155, 0.68)', text: '#1f5c2a' },
-  { bg: 'rgba(120, 190, 235, 0.68)', text: '#0b4a73' },
-  { bg: 'rgba(210, 160, 225, 0.68)', text: '#5c1f70' },
+  { bg: '#ceddff', text: '#294b8a' },
+  { bg: '#e0d9f7', text: '#574681' },
+  { bg: '#cde9e1', text: '#275e51' },
+  { bg: '#d2e7f4', text: '#345a75' },
+  { bg: '#f0dce6', text: '#80506c' },
 ]
 
 // Decompose a contiguous cell-index range into the fewest axis-aligned
@@ -25,7 +25,9 @@ function decomposeRange(startIndex, endIndex, columns) {
   const endCol = lastIndex % columns
 
   if (startRow === endRow) {
-    return [{ row: startRow, startCol, length: endCol - startCol + 1, rowSpan: 1 }]
+    return [
+      { row: startRow, startCol, length: endCol - startCol + 1, rowSpan: 1 },
+    ]
   }
 
   const blocks = []
@@ -33,10 +35,20 @@ function decomposeRange(startIndex, endIndex, columns) {
   const fullRowsEnd = endCol === columns - 1 ? endRow : endRow - 1
 
   if (startCol !== 0) {
-    blocks.push({ row: startRow, startCol, length: columns - startCol, rowSpan: 1 })
+    blocks.push({
+      row: startRow,
+      startCol,
+      length: columns - startCol,
+      rowSpan: 1,
+    })
   }
   if (fullRowsStart <= fullRowsEnd) {
-    blocks.push({ row: fullRowsStart, startCol: 0, length: columns, rowSpan: fullRowsEnd - fullRowsStart + 1 })
+    blocks.push({
+      row: fullRowsStart,
+      startCol: 0,
+      length: columns,
+      rowSpan: fullRowsEnd - fullRowsStart + 1,
+    })
   }
   if (endCol !== columns - 1) {
     blocks.push({ row: endRow, startCol: 0, length: endCol + 1, rowSpan: 1 })
@@ -53,7 +65,9 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
     if (!el) return undefined
     const compute = () => {
       const colWidth = (el.clientWidth - GAP * (COLUMNS - 1)) / COLUMNS
-      setCellHeight(Math.max(MIN_CELL_HEIGHT, Math.min(MAX_CELL_HEIGHT, colWidth)))
+      setCellHeight(
+        Math.max(MIN_CELL_HEIGHT, Math.min(MAX_CELL_HEIGHT, colWidth)),
+      )
     }
     compute()
     const ro = new ResizeObserver(compute)
@@ -66,7 +80,10 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
   }, [])
 
   const totalCells = useMemo(() => {
-    const limit = overallLimit > 0 ? overallLimit : Math.max(Math.ceil((spent * 1.2) / UNIT) * UNIT, UNIT * 10)
+    const limit =
+      overallLimit > 0
+        ? overallLimit
+        : Math.max(Math.ceil((spent * 1.2) / UNIT) * UNIT, UNIT * 10)
     return Math.max(Math.ceil(limit / UNIT), 1)
   }, [overallLimit, spent])
 
@@ -74,7 +91,13 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
 
   const itemBlocks = useMemo(() => {
     const items = [...transactions]
-      .sort((a, b) => (a.date === b.date ? a.created_at?.localeCompare(b.created_at) : a.date < b.date ? -1 : 1))
+      .sort((a, b) =>
+        a.date === b.date
+          ? a.created_at?.localeCompare(b.created_at)
+          : a.date < b.date
+            ? -1
+            : 1,
+      )
       .map((t, i) => {
         const categoryName = t.categories?.name || '기타'
         let label
@@ -84,7 +107,13 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
           label = t.memo ? `${categoryName}(${t.memo})` : categoryName
         }
         const palette = PALETTE[i % PALETTE.length]
-        return { id: t.id, label, amount: Number(t.amount), color: palette.bg, textColor: palette.text }
+        return {
+          id: t.id,
+          label,
+          amount: Number(t.amount),
+          color: palette.bg,
+          textColor: palette.text,
+        }
       })
 
     let cumulative = 0
@@ -114,7 +143,10 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
           rowSpan: b.rowSpan,
           color: item.color,
           textColor: item.textColor,
-          label: i === labelBlockIndex ? `${item.label} ${formatShortWon(item.amount)}` : null,
+          label:
+            i === labelBlockIndex
+              ? `${item.label} ${formatShortWon(item.amount)}`
+              : null,
         })
       })
     }
@@ -127,7 +159,10 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
     <div className="coloring-grid-wrap" ref={wrapRef}>
       <div
         className="coloring-base-grid"
-        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: rowTemplate }}
+        style={{
+          gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`,
+          gridTemplateRows: rowTemplate,
+        }}
       >
         {Array.from({ length: totalCells }).map((_, i) => (
           <div key={i} className="coloring-base-cell" />
@@ -135,7 +170,10 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
       </div>
       <div
         className="coloring-overlay-grid"
-        style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`, gridTemplateRows: rowTemplate }}
+        style={{
+          gridTemplateColumns: `repeat(${COLUMNS}, 1fr)`,
+          gridTemplateRows: rowTemplate,
+        }}
       >
         {itemBlocks.map((b) => (
           <div
@@ -148,7 +186,10 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
             }}
           >
             {b.label && (
-              <span className="coloring-run-label" style={{ color: b.textColor }}>
+              <span
+                className="coloring-run-label"
+                style={{ color: b.textColor }}
+              >
                 {b.label}
               </span>
             )}

@@ -30,7 +30,7 @@ export default function DashboardCalendar({ month, transactions }) {
   }, [month])
 
   const today = todayStr()
-  const activeDate = selectedDate && byDate[selectedDate] ? selectedDate : selectedDate
+  const activeDate = selectedDate?.startsWith(month) ? selectedDate : null
   const dayData = activeDate ? byDate[activeDate] : null
 
   return (
@@ -42,23 +42,41 @@ export default function DashboardCalendar({ month, transactions }) {
       </div>
       <div className="calendar-grid">
         {cells.map((dateStr, i) => {
-          if (!dateStr) return <div key={`blank-${i}`} className="calendar-day calendar-day-empty" />
+          if (!dateStr)
+            return (
+              <div
+                key={`blank-${i}`}
+                className="calendar-day calendar-day-empty"
+              />
+            )
           const data = byDate[dateStr]
           const dayNum = Number(dateStr.slice(-2))
           return (
             <button
               key={dateStr}
+              aria-label={`${dateStr}${data ? `, 지출 ${formatWon(data.expense)}, 수입 ${formatWon(data.income)}` : ', 내역 없음'}`}
+              aria-pressed={dateStr === activeDate}
               type="button"
               className={
                 'calendar-day' +
                 (dateStr === selectedDate ? ' selected' : '') +
                 (dateStr === today ? ' today' : '')
               }
-              onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
+              onClick={() =>
+                setSelectedDate(dateStr === selectedDate ? null : dateStr)
+              }
             >
               <span className="calendar-day-num">{dayNum}</span>
-              {data?.expense > 0 && <span className="calendar-expense">-{formatShortWon(data.expense)}</span>}
-              {data?.income > 0 && <span className="calendar-income">+{formatShortWon(data.income)}</span>}
+              {data?.expense > 0 && (
+                <span className="calendar-expense">
+                  -{formatShortWon(data.expense)}
+                </span>
+              )}
+              {data?.income > 0 && (
+                <span className="calendar-income">
+                  +{formatShortWon(data.income)}
+                </span>
+              )}
             </button>
           )
         })}
@@ -73,11 +91,18 @@ export default function DashboardCalendar({ month, transactions }) {
             dayData.items.map((t) => (
               <div key={t.id} className="tx-row">
                 <div className="tx-row-left">
-                  <div className="tx-icon" style={{ background: (t.categories?.color || '#94a3b8') + '22' }}>
+                  <div
+                    className="tx-icon"
+                    style={{
+                      background: (t.categories?.color || '#94a3b8') + '22',
+                    }}
+                  >
                     {t.categories?.icon || '💸'}
                   </div>
                   <div className="tx-info">
-                    <div className="tx-category">{t.categories?.name || '미분류'}</div>
+                    <div className="tx-category">
+                      {t.categories?.name || '미분류'}
+                    </div>
                     {t.memo && <div className="tx-memo">{t.memo}</div>}
                     <div className="tx-meta">{t.profiles?.name}</div>
                   </div>

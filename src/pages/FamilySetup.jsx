@@ -1,3 +1,4 @@
+import Icon from '../components/Icon'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -17,7 +18,9 @@ export default function FamilySetup() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { data, error: rpcError } = await supabase.rpc('create_family', { family_name: familyName })
+    const { data, error: rpcError } = await supabase.rpc('create_family', {
+      family_name: familyName,
+    })
     setBusy(false)
     if (rpcError) {
       setError(rpcError.message)
@@ -32,7 +35,9 @@ export default function FamilySetup() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error: rpcError } = await supabase.rpc('join_family', { code: inviteCode.trim() })
+    const { error: rpcError } = await supabase.rpc('join_family', {
+      code: inviteCode.trim(),
+    })
     setBusy(false)
     if (rpcError) {
       setError(rpcError.message)
@@ -52,7 +57,9 @@ export default function FamilySetup() {
       <div className="auth-shell">
         <div className="auth-card">
           <div className="auth-title">그룹이 만들어졌어요!</div>
-          <div className="auth-subtitle">아래 초대 코드를 가족에게 공유해주세요</div>
+          <div className="auth-subtitle">
+            아래 초대 코드를 가족에게 공유해주세요
+          </div>
           <div className="invite-code-box">
             <div className="hint-text">초대 코드</div>
             <div className="invite-code-value">{createdCode}</div>
@@ -68,53 +75,86 @@ export default function FamilySetup() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div className="auth-title">가족 그룹 설정</div>
-        <div className="auth-subtitle">그룹을 새로 만들거나 초대 코드로 참여하세요</div>
+        <img src="./favicon.svg" alt="" className="brand-icon-lg" />
+        <div className="auth-title">우리 가족을 연결해요</div>
+        <div className="auth-subtitle">
+          그룹을 새로 만들거나 초대 코드로 참여하세요
+        </div>
 
         <div className="auth-tabs">
-          <div className={'auth-tab' + (mode === 'create' ? ' active' : '')} onClick={() => setMode('create')}>
+          <button
+            type="button"
+            className={'auth-tab' + (mode === 'create' ? ' active' : '')}
+            onClick={() => setMode('create')}
+          >
             그룹 만들기
-          </div>
-          <div className={'auth-tab' + (mode === 'join' ? ' active' : '')} onClick={() => setMode('join')}>
+          </button>
+          <button
+            type="button"
+            className={'auth-tab' + (mode === 'join' ? ' active' : '')}
+            onClick={() => setMode('join')}
+          >
             초대 코드로 참여
-          </div>
+          </button>
         </div>
 
         {mode === 'create' ? (
           <form onSubmit={handleCreate}>
             <div className="field">
-              <label>그룹 이름</label>
+              <label htmlFor="family-name">그룹 이름</label>
               <input
+                id="family-name"
                 required
                 value={familyName}
                 onChange={(e) => setFamilyName(e.target.value)}
                 placeholder="예: 김씨네 가족"
               />
             </div>
-            {error && <div className="error-text">{error}</div>}
-            <button className="btn btn-primary btn-block" disabled={busy} type="submit">
+            {error && (
+              <div className="error-text" role="alert">
+                {error}
+              </div>
+            )}
+            <button
+              className="btn btn-primary btn-block"
+              disabled={busy}
+              type="submit"
+            >
               {busy ? '만드는 중...' : '그룹 만들기'}
             </button>
           </form>
         ) : (
           <form onSubmit={handleJoin}>
             <div className="field">
-              <label>초대 코드</label>
+              <label htmlFor="family-code">초대 코드</label>
               <input
+                id="family-code"
                 required
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                 placeholder="예: A1B2C3"
               />
             </div>
-            {error && <div className="error-text">{error}</div>}
-            <button className="btn btn-primary btn-block" disabled={busy} type="submit">
+            {error && (
+              <div className="error-text" role="alert">
+                {error}
+              </div>
+            )}
+            <button
+              className="btn btn-primary btn-block"
+              disabled={busy}
+              type="submit"
+            >
               {busy ? '참여하는 중...' : '참여하기'}
             </button>
           </form>
         )}
 
-        <button className="btn btn-ghost btn-block" style={{ marginTop: 12 }} onClick={signOut}>
+        <button
+          className="btn btn-ghost btn-block"
+          style={{ marginTop: 12 }}
+          onClick={signOut}
+        >
           로그아웃
         </button>
       </div>

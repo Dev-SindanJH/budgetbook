@@ -10,7 +10,7 @@ export const DASHBOARD_PANELS = [
 
 const STORAGE_KEY = 'budgetbook_dashboard_prefs'
 
-const DEFAULTS = Object.fromEntries(DASHBOARD_PANELS.map((p) => [p.key, true]))
+const DEFAULTS = Object.fromEntries(DASHBOARD_PANELS.map((p) => [p.key, ['budget', 'cardDue', 'recent'].includes(p.key)]))
 
 export function getDashboardPrefs() {
   try {
