@@ -9,6 +9,7 @@ import { useCreditCards } from '../hooks/useCreditCards'
 import { useCashSettings } from '../hooks/useCashSettings'
 import { useCashAssets } from '../hooks/useCashAssets'
 import { useStockHoldings } from '../hooks/useStockHoldings'
+import { useSavingsPlans } from '../hooks/useSavingsPlans'
 import { addTransaction } from '../lib/api'
 import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
 import { getDashboardPrefs } from '../lib/dashboardPrefs'
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const { assets: cashAssets, total: cashAssetTotal, loading: cashAssetsLoading } = useCashAssets(family?.id)
   const [showCashDetails, setShowCashDetails] = useState(false)
   const { holdings, totalValue: stockValue, missingCount: missingStocks } = useStockHoldings(family?.id)
+  const { plans: savingsPlans, loading: savingsLoading } = useSavingsPlans(family?.id)
   const prefs = getDashboardPrefs()
 
   async function handleAddTransaction(payload) {
@@ -108,6 +110,11 @@ export default function Dashboard() {
   const unpaidCredit = allTransactions
     .filter((t) => isCreditCardExpense(t) && t.date <= today && t.card_due_date > today)
     .reduce((sum, t) => sum + Number(t.amount), 0)
+  const savingsValue = allTransactions
+    .filter((t) => t.savings_plan_id && t.date <= today)
+    .reduce((sum, t) => sum + Number(t.amount), 0)
+  const cashValue = cashAssets.length > 0 ? cashAssetTotal : (currentCash ?? 0)
+  const totalAssets = cashValue + savingsValue + stockValue
 
   const recent = transactions.slice(0, 5)
 
@@ -153,6 +160,18 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="hint-text cash-flow-note">총 지출은 사용한 달에, 신용카드 자동이체는 돈이 빠지는 달의 예상 현금 흐름에 한 번만 반영해요. 이 금액은 보유 현금 잔액이 아니에요.</div>
+      <div className="card summary-card total-assets-card">
+        <span className="summary-label">총 보유 자산</span>
+        <span className="summary-value">{formatWon(totalAssets)}</span>
+        <div className="cash-summary-details total-assets-breakdown">
+          <div className="cash-summary-detail-row"><span>현금</span><strong>{formatWon(cashValue)}</strong></div>
+          <div className="cash-summary-detail-row"><span>적금 납입액</span><strong>{formatWon(savingsValue)}</strong></div>
+          <div className="cash-summary-detail-row"><span>주식 평가액</span><strong>{formatWon(stockValue)}</strong></div>
+        </div>
+        <span className="hint-text">등록한 현금 + 지금까지 납입한 적금 + 확인된 최근 종가 기준 주식 평가액</span>
+        {(missingStocks > 0 || savingsLoading) && <span className="hint-text">{savingsLoading ? '적금 정보를 불러오는 중이에요.' : `시세를 확인할 수 없는 ${missingStocks}개 종목은 합계에서 제외했어요.`}</span>}
+        {savingsPlans.length === 0 && <span className="hint-text"><Link to="/budget">적금 등록하기 →</Link></span>}
+      </div>
       <div className="grid grid-3">
         {prefs.budget && <div className="card summary-card">
           <button type="button" className="cash-summary-toggle" aria-expanded={showCashDetails} onClick={() => setShowCashDetails((value) => !value)}>

@@ -395,6 +395,20 @@ a {
 .summary-value.income { color: var(--income); }
 .summary-value.expense { color: var(--expense); }
 
+.total-assets-card {
+  margin-bottom: 16px;
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.total-assets-card > .summary-value {
+  font-size: 30px;
+}
+
+.total-assets-breakdown {
+  max-width: 420px;
+  width: 100%;
+}
+
 .cash-flow-note {
   margin: 10px 2px 16px;
 }
