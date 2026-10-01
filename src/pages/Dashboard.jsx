@@ -7,6 +7,7 @@ import { useProfiles } from '../hooks/useProfiles'
 import { useCategories } from '../hooks/useCategories'
 import { useCreditCards } from '../hooks/useCreditCards'
 import { useCashSettings } from '../hooks/useCashSettings'
+import { useCashAssets } from '../hooks/useCashAssets'
 import { useStockHoldings } from '../hooks/useStockHoldings'
 import { addTransaction } from '../lib/api'
 import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
@@ -29,6 +30,8 @@ export default function Dashboard() {
   const { categories } = useCategories(family?.id)
   const { cards } = useCreditCards(family?.id)
   const { cashSettings } = useCashSettings(family?.id)
+  const { assets: cashAssets, total: cashAssetTotal, loading: cashAssetsLoading } = useCashAssets(family?.id)
+  const [showCashDetails, setShowCashDetails] = useState(false)
   const { holdings, totalValue: stockValue, missingCount: missingStocks } = useStockHoldings(family?.id)
   const prefs = getDashboardPrefs()
 
@@ -152,11 +155,15 @@ export default function Dashboard() {
       <div className="hint-text cash-flow-note">총 지출은 사용한 달에, 신용카드 자동이체는 돈이 빠지는 달의 예상 현금 흐름에 한 번만 반영해요. 이 금액은 보유 현금 잔액이 아니에요.</div>
       <div className="grid grid-3">
         {prefs.budget && <div className="card summary-card">
-          <span className="summary-label">전체 보유 현금</span>
-          {currentCash === null
-            ? <span className="hint-text"><Link to="/budget">보유 현금 입력하기</Link></span>
-            : <span className="summary-value">{formatWon(currentCash)}</span>}
-          <span className="hint-text">{today}까지의 수입, 현금 지출, 적금 납입과 카드 자동이체를 반영했어요.</span>
+          <button type="button" className="cash-summary-toggle" aria-expanded={showCashDetails} onClick={() => setShowCashDetails((value) => !value)}>
+            <span className="summary-label">전체 보유 현금</span>
+            <span className="summary-value">{cashAssets.length > 0 ? formatWon(cashAssetTotal) : currentCash === null ? '항목 등록하기' : formatWon(currentCash)}</span>
+            <span className="hint-text">{cashAssets.length > 0 ? `${cashAssets.length}개 항목 · 눌러서 상세 보기 ${showCashDetails ? '▲' : '▼'}` : '눌러서 상세 보기 · 자산 관리에서 항목을 등록할 수 있어요'}</span>
+          </button>
+          {showCashDetails && <div className="cash-summary-details">
+            {cashAssetsLoading ? <div className="hint-text">불러오는 중...</div> : cashAssets.length > 0 ? cashAssets.map((asset) => <div className="cash-summary-detail-row" key={asset.id}><span>{asset.name}</span><strong>{formatWon(asset.amount)}</strong></div>) : <div className="hint-text">등록된 현금 항목이 없어요. <Link to="/budget">자산 관리에서 추가하기 →</Link></div>}
+            {cashAssets.length > 0 && <Link className="hint-text" to="/budget">현금 항목 관리 →</Link>}
+          </div>}
           {legacyCardCount > 0 && <span className="hint-text">카드 미지정 기존 내역 {legacyCardCount}건은 반영되지 않았어요.</span>}
         </div>}
         <div className="card summary-card">

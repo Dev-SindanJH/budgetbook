@@ -1218,6 +1218,37 @@ a {
   border-bottom: none;
 }
 
+.cash-summary-toggle {
+  display: flex;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.cash-summary-toggle .summary-value { margin: 0; }
+
+.cash-summary-details {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.cash-summary-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
 @media (max-width: 720px) {
   .transactions-desktop-add {
     display: none;

@@ -30,6 +30,19 @@ export async function saveCashSettings(payload) {
   if (error) throw error
 }
 
+export async function saveCashAsset({ id, family_id, name, amount }) {
+  const query = id
+    ? supabase.from('cash_assets').update({ name, amount }).eq('id', id)
+    : supabase.from('cash_assets').insert({ family_id, name, amount })
+  const { error } = await query
+  if (error) throw error
+}
+
+export async function deleteCashAsset(id) {
+  const { error } = await supabase.from('cash_assets').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function addSavingsPlan(payload) {
   const { error } = await supabase.from('savings_plans').insert(payload)
   if (error) throw error
@@ -134,6 +147,8 @@ export async function importTransactions(familyId, memberId, transactions) {
 }
 
 export async function resetFamilyData(familyId) {
+  const { error: cashAssetError } = await supabase.from('cash_assets').delete().eq('family_id', familyId)
+  if (cashAssetError) throw cashAssetError
   const { error: stockError } = await supabase.from('stock_holdings').delete().eq('family_id', familyId)
   if (stockError) throw stockError
   const { error: e0 } = await supabase.from('savings_plans').delete().eq('family_id', familyId)

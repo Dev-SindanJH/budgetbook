@@ -4,10 +4,11 @@ import { useCategories } from '../hooks/useCategories'
 import { useTransactions } from '../hooks/useTransactions'
 import { useBudgets } from '../hooks/useBudgets'
 import { useCashSettings } from '../hooks/useCashSettings'
+import { useCashAssets } from '../hooks/useCashAssets'
 import { useSavingsPlans } from '../hooks/useSavingsPlans'
 import { useLoans } from '../hooks/useLoans'
 import { useStockHoldings } from '../hooks/useStockHoldings'
-import { upsertBudget, saveCashSettings, addSavingsPlan, updateSavingsPlan, addLoan, updateLoan, saveStockHolding, deleteStockHolding } from '../lib/api'
+import { upsertBudget, saveCashSettings, saveCashAsset, deleteCashAsset, addSavingsPlan, updateSavingsPlan, addLoan, updateLoan, saveStockHolding, deleteStockHolding } from '../lib/api'
 import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
 import { recordedCashBalance } from '../utils/creditCards'
 import { savingsAmounts } from '../utils/savings'
@@ -25,6 +26,7 @@ export default function Budget() {
   const { transactions: allTransactions, refresh: refreshTransactions } = useTransactions(family?.id)
   const { budgets, refresh } = useBudgets(family?.id, month)
   const { cashSettings, refresh: refreshCashSettings } = useCashSettings(family?.id)
+  const { assets: cashAssets, total: cashAssetTotal, refresh: refreshCashAssets, error: cashAssetsError } = useCashAssets(family?.id)
   const { plans, error: plansError, refresh: refreshPlans } = useSavingsPlans(family?.id)
   const { loans, error: loansError, refresh: refreshLoans } = useLoans(family?.id)
   const { holdings, error: stocksError, quoteError, refreshingPrices, totalValue: stockValue, missingCount, refresh: refreshStocks } = useStockHoldings(family?.id)
@@ -33,6 +35,11 @@ export default function Budget() {
   const [openingBalance, setOpeningBalance] = useState('')
   const [cashMessage, setCashMessage] = useState('')
   const [savingCash, setSavingCash] = useState(false)
+  const [cashAssetName, setCashAssetName] = useState('')
+  const [cashAssetAmount, setCashAssetAmount] = useState('')
+  const [editingCashAssetId, setEditingCashAssetId] = useState(null)
+  const [cashAssetMessage, setCashAssetMessage] = useState('')
+  const [savingCashAsset, setSavingCashAsset] = useState(false)
   const [planName, setPlanName] = useState('')
   const [planAmount, setPlanAmount] = useState('')
   const [planDay, setPlanDay] = useState('1')
@@ -63,6 +70,33 @@ export default function Budget() {
   }, [cashSettings])
 
   const currentCash = recordedCashBalance(allTransactions, cashSettings, todayStr())
+
+  async function handleSaveCashAsset(e) {
+    e.preventDefault()
+    const amount = Number(cashAssetAmount)
+    if (!cashAssetName.trim() || !Number.isFinite(amount) || amount < 0) {
+      setCashAssetMessage('보유처 이름과 0원 이상의 금액을 입력해주세요')
+      return
+    }
+    setSavingCashAsset(true)
+    setCashAssetMessage('')
+    try {
+      await saveCashAsset({ id: editingCashAssetId, family_id: family.id, name: cashAssetName.trim(), amount })
+      await refreshCashAssets()
+      setCashAssetName('')
+      setCashAssetAmount('')
+      setEditingCashAssetId(null)
+      setCashAssetMessage('현금 항목을 저장했어요')
+    } catch (err) {
+      setCashAssetMessage(err.message || '현금 항목을 저장하지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.')
+    } finally { setSavingCashAsset(false) }
+  }
+
+  async function handleDeleteCashAsset(asset) {
+    if (!window.confirm(`'${asset.name}' 항목을 삭제할까요?`)) return
+    try { await deleteCashAsset(asset.id); await refreshCashAssets(); setCashAssetMessage('현금 항목을 삭제했어요') }
+    catch (err) { setCashAssetMessage(err.message || '현금 항목을 삭제하지 못했어요') }
+  }
 
   async function handleSaveCash(e) {
     e.preventDefault()
@@ -249,7 +283,29 @@ export default function Budget() {
       </div>
 
       <div className="card">
-        <div className="section-title">전체 보유 현금</div>
+        <div className="section-title">보유 현금 항목</div>
+        <div className="summary-value" style={{ marginBottom: 8 }}>{formatWon(cashAssetTotal)}</div>
+        <div className="hint-text" style={{ marginBottom: 12 }}>전세금, 통장 잔액처럼 보유 현금을 항목별로 등록해요. 홈에는 항목의 합계가 표시돼요.</div>
+        {cashAssetsError && <div className="error-text">현금 항목을 불러오지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.</div>}
+        {cashAssets.map((asset) => <div className="settings-list-item" key={asset.id}>
+          <div><strong>{asset.name}</strong><div className="hint-text">{formatWon(asset.amount)}</div></div>
+          <div className="stock-holding-actions">
+            <button type="button" className="btn btn-sm" onClick={() => { setEditingCashAssetId(asset.id); setCashAssetName(asset.name); setCashAssetAmount(String(asset.amount)); setCashAssetMessage('') }}>수정</button>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleDeleteCashAsset(asset)}>삭제</button>
+          </div>
+        </div>)}
+        {cashAssets.length === 0 && <div className="empty-state" style={{ marginBottom: 12 }}>등록된 현금 항목이 없어요</div>}
+        <form className="credit-card-form" onSubmit={handleSaveCashAsset}>
+          <div className="field"><label htmlFor="cash-asset-name">보유처</label><input id="cash-asset-name" value={cashAssetName} onChange={(e) => setCashAssetName(e.target.value)} placeholder="예: 전세금, 농협통장" maxLength={60} required /></div>
+          <div className="field"><label htmlFor="cash-asset-amount">금액 (원)</label><input id="cash-asset-amount" type="number" min="0" value={cashAssetAmount} onChange={(e) => setCashAssetAmount(e.target.value)} required /></div>
+          <button className="btn btn-primary" type="submit" disabled={savingCashAsset}>{savingCashAsset ? '저장 중...' : editingCashAssetId ? '항목 수정' : '항목 추가'}</button>
+          {editingCashAssetId && <button className="btn" type="button" onClick={() => { setEditingCashAssetId(null); setCashAssetName(''); setCashAssetAmount('') }}>취소</button>}
+        </form>
+        {cashAssetMessage && <div className="hint-text" role="status">{cashAssetMessage}</div>}
+      </div>
+
+      <div className="card">
+        <div className="section-title">거래 기준 현금 잔액</div>
         <div className="summary-value" style={{ marginBottom: 8 }}>{currentCash === null ? '기준 금액을 입력해주세요' : formatWon(currentCash)}</div>
         <div className="hint-text" style={{ marginBottom: 12 }}>기준일 아침의 현금을 입력하면 이후 수입, 현금 지출, 적금 납입, 신용카드 자동이체를 날짜에 맞춰 더하고 빼요.</div>
         <form className="credit-card-form" onSubmit={handleSaveCash}>

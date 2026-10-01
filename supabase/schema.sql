@@ -65,6 +65,15 @@ create table if not exists public.cash_settings (
   opening_balance numeric not null check (opening_balance >= 0)
 );
 
+-- 보유 현금을 통장·보증금 등 항목별로 기록합니다.
+create table if not exists public.cash_assets (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  name text not null check (length(trim(name)) between 1 and 60),
+  amount numeric not null check (amount >= 0),
+  created_at timestamptz not null default now()
+);
+
 alter table public.transactions add column if not exists card_id uuid references public.credit_cards(id);
 alter table public.transactions add column if not exists card_due_date date;
 create index if not exists transactions_card_due_date_idx on public.transactions(card_due_date);
@@ -236,6 +245,7 @@ alter table public.categories enable row level security;
 alter table public.transactions enable row level security;
 alter table public.credit_cards enable row level security;
 alter table public.cash_settings enable row level security;
+alter table public.cash_assets enable row level security;
 alter table public.budgets enable row level security;
 
 -- families: 내 가족만 조회 가능
@@ -279,6 +289,11 @@ create policy "credit_cards_update_own" on public.credit_cards
 
 drop policy if exists "cash_settings_all_family" on public.cash_settings;
 create policy "cash_settings_all_family" on public.cash_settings
+  for all using (family_id = public.current_family_id())
+  with check (family_id = public.current_family_id());
+
+drop policy if exists "cash_assets_all_family" on public.cash_assets;
+create policy "cash_assets_all_family" on public.cash_assets
   for all using (family_id = public.current_family_id())
   with check (family_id = public.current_family_id());
 
