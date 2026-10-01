@@ -5,8 +5,9 @@ import { useTransactions } from '../hooks/useTransactions'
 import { useBudgets } from '../hooks/useBudgets'
 import { useCashSettings } from '../hooks/useCashSettings'
 import { useSavingsPlans } from '../hooks/useSavingsPlans'
+import { useLoans } from '../hooks/useLoans'
 import { useStockHoldings } from '../hooks/useStockHoldings'
-import { upsertBudget, saveCashSettings, addSavingsPlan, updateSavingsPlan, saveStockHolding, deleteStockHolding } from '../lib/api'
+import { upsertBudget, saveCashSettings, addSavingsPlan, updateSavingsPlan, addLoan, updateLoan, saveStockHolding, deleteStockHolding } from '../lib/api'
 import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
 import { recordedCashBalance } from '../utils/creditCards'
 import BudgetProgressBar from '../components/BudgetProgressBar'
@@ -19,11 +20,12 @@ export default function Budget() {
 
   const { categories } = useCategories(family?.id)
   const { transactions: monthTransactions } = useTransactions(family?.id, { from, to })
-  const transactions = useMemo(() => monthTransactions.filter((t) => !t.savings_plan_id || t.date <= todayStr()), [monthTransactions])
+  const transactions = useMemo(() => monthTransactions.filter((t) => ((!t.savings_plan_id && !t.loan_id) || t.date <= todayStr())), [monthTransactions])
   const { transactions: allTransactions, refresh: refreshTransactions } = useTransactions(family?.id)
   const { budgets, refresh } = useBudgets(family?.id, month)
   const { cashSettings, refresh: refreshCashSettings } = useCashSettings(family?.id)
   const { plans, error: plansError, refresh: refreshPlans } = useSavingsPlans(family?.id)
+  const { loans, error: loansError, refresh: refreshLoans } = useLoans(family?.id)
   const { holdings, error: stocksError, quoteError, refreshingPrices, totalValue: stockValue, missingCount, refresh: refreshStocks } = useStockHoldings(family?.id)
 
   const [openingDate, setOpeningDate] = useState(todayStr())
@@ -37,6 +39,15 @@ export default function Budget() {
   const [planMaturity, setPlanMaturity] = useState('')
   const [planMessage, setPlanMessage] = useState('')
   const [savingPlan, setSavingPlan] = useState(false)
+  const [loanName, setLoanName] = useState('')
+  const [loanDate, setLoanDate] = useState(todayStr())
+  const [loanRepaymentDate, setLoanRepaymentDate] = useState('')
+  const [loanAmount, setLoanAmount] = useState('')
+  const [loanRate, setLoanRate] = useState('')
+  const [loanDay, setLoanDay] = useState('1')
+  const [loanMethod, setLoanMethod] = useState('현금')
+  const [loanMessage, setLoanMessage] = useState('')
+  const [savingLoan, setSavingLoan] = useState(false)
   const [stockSymbol, setStockSymbol] = useState('')
   const [stockMarket, setStockMarket] = useState('KOSPI')
   const [stockQuantity, setStockQuantity] = useState('')
@@ -102,6 +113,41 @@ export default function Budget() {
       setPlanMessage(plan.active ? '앞으로 예정된 납입을 중지했어요' : '납입 일정을 다시 등록했어요')
     } catch (err) {
       setPlanMessage(err.message || '적금 상태를 변경하지 못했어요')
+    }
+  }
+
+  async function handleAddLoan(e) {
+    e.preventDefault()
+    const amount = Number(loanAmount)
+    const rate = Number(loanRate)
+    const day = Number(loanDay)
+    if (!loanName.trim() || !loanDate || !loanRepaymentDate || loanRepaymentDate < loanDate || !Number.isFinite(amount) || amount <= 0 || !Number.isFinite(rate) || rate < 0 || !Number.isInteger(day) || day < 1 || day > 31) {
+      setLoanMessage('대출 이름, 대출일, 상환일, 대출금액, 연이율과 이자 납입일을 확인해주세요')
+      return
+    }
+    setSavingLoan(true)
+    setLoanMessage('')
+    try {
+      await addLoan({ family_id: family.id, member_id: profile.id, name: loanName.trim(), loan_date: loanDate, repayment_date: loanRepaymentDate, principal_amount: amount, annual_interest_rate: rate, interest_day: day, payment_method: loanMethod })
+      await Promise.all([refreshLoans(), refreshTransactions()])
+      setLoanName('')
+      setLoanAmount('')
+      setLoanRate('')
+      setLoanMessage('대출과 월 이자 지출을 등록했어요')
+    } catch (err) {
+      setLoanMessage(err.message || '대출을 등록하지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.')
+    } finally {
+      setSavingLoan(false)
+    }
+  }
+
+  async function handleToggleLoan(loan) {
+    try {
+      await updateLoan(loan.id, { active: !loan.active })
+      await Promise.all([refreshLoans(), refreshTransactions()])
+      setLoanMessage(loan.active ? '앞으로 예정된 이자 지출을 중지했어요' : '이자 납입 일정을 다시 등록했어요')
+    } catch (err) {
+      setLoanMessage(err.message || '대출 상태를 변경하지 못했어요')
     }
   }
 
@@ -259,11 +305,35 @@ export default function Budget() {
           <div className="field"><label htmlFor="savings-name">적금 이름</label><input id="savings-name" value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="예: 여행 적금" maxLength={80} required /></div>
           <div className="field"><label htmlFor="savings-amount">매달 납입액</label><input id="savings-amount" type="number" min="1" value={planAmount} onChange={(e) => setPlanAmount(e.target.value)} required /></div>
           <div className="field"><label htmlFor="savings-day">매달 납입일</label><input id="savings-day" type="number" min="1" max="31" value={planDay} onChange={(e) => setPlanDay(e.target.value)} required /></div>
-          <div className="field"><label htmlFor="savings-start">첫 납입월</label><input id="savings-start" type="month" min={monthStr()} value={planStartMonth} onChange={(e) => setPlanStartMonth(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="savings-start">첫 납입월</label><input id="savings-start" type="month" value={planStartMonth} onChange={(e) => setPlanStartMonth(e.target.value)} required /></div>
           <div className="field"><label htmlFor="savings-maturity">만기일</label><input id="savings-maturity" type="date" min={`${planStartMonth}-01`} value={planMaturity} onChange={(e) => setPlanMaturity(e.target.value)} required /></div>
           <button className="btn btn-primary" type="submit" disabled={savingPlan}>{savingPlan ? '등록 중...' : '적금 추가'}</button>
         </form>
         {planMessage && <div className="hint-text" role="status">{planMessage}</div>}
+      </div>
+
+      <div className="card">
+        <div className="section-title">대출</div>
+        <div className="hint-text" style={{ marginBottom: 12 }}>연이율 기준으로 월 이자를 계산해 납입일에 지출로 자동 등록해요. 대출일이 포함된 달은 대출일 이후의 납입일부터 계산해요.</div>
+        {loansError && <div className="error-text">대출 목록을 불러오지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.</div>}
+        {loans.length === 0 && <div className="hint-text" style={{ marginBottom: 12 }}>등록한 대출이 없어요.</div>}
+        {loans.map((loan) => (
+          <div className="settings-list-item" key={loan.id}>
+            <span><strong>{loan.name}</strong> · {formatWon(loan.principal_amount)} · 연 {Number(loan.annual_interest_rate)}% · 매달 {loan.interest_day}일 {loan.payment_method === '현금' ? '현금' : '카드'} · 상환 {loan.repayment_date}{!loan.active && ' · 중지'}</span>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleToggleLoan(loan)}>{loan.active ? '중지' : '다시 시작'}</button>
+          </div>
+        ))}
+        <form className="loan-form" onSubmit={handleAddLoan}>
+          <div className="field"><label htmlFor="loan-name">대출 이름</label><input id="loan-name" value={loanName} onChange={(e) => setLoanName(e.target.value)} placeholder="예: 전세자금대출" maxLength={80} required /></div>
+          <div className="field"><label htmlFor="loan-date">대출일</label><input id="loan-date" type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="loan-repayment">상환일</label><input id="loan-repayment" type="date" min={loanDate} value={loanRepaymentDate} onChange={(e) => setLoanRepaymentDate(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="loan-amount">대출금액</label><input id="loan-amount" type="number" min="1" step="1" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="loan-rate">연이율 (%)</label><input id="loan-rate" type="number" min="0" step="0.01" value={loanRate} onChange={(e) => setLoanRate(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="loan-day">매달 이자 납입일</label><input id="loan-day" type="number" min="1" max="31" value={loanDay} onChange={(e) => setLoanDay(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="loan-method">이자 납입 방식</label><select id="loan-method" value={loanMethod} onChange={(e) => setLoanMethod(e.target.value)}><option value="현금">현금</option><option value="신용카드">카드</option></select></div>
+          <button className="btn btn-primary" type="submit" disabled={savingLoan}>{savingLoan ? '등록 중...' : '대출 추가'}</button>
+        </form>
+        {loanMessage && <div className="hint-text" role="status">{loanMessage}</div>}
       </div>
 
       {overRows.length > 0 && (

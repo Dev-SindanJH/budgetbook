@@ -159,7 +159,7 @@ export default function Settings() {
   }
 
   async function handleReset() {
-    if (!window.confirm('정말로 모든 거래·예산·적금·보유 주식 데이터를 삭제할까요? 되돌릴 수 없어요.')) return
+    if (!window.confirm('정말로 모든 거래·예산·적금·대출·보유 주식 데이터를 삭제할까요? 되돌릴 수 없어요.')) return
     if (!window.confirm('한 번 더 확인할게요. 정말 초기화할까요?')) return
     setBusy(true)
     try {

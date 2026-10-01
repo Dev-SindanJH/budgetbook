@@ -44,7 +44,7 @@ export default function Statistics() {
     return allTransactions.filter((t) => {
       if (range.from && t.date < range.from) return false
       if (range.to && t.date > range.to) return false
-      if (t.savings_plan_id && t.date > todayStr()) return false
+      if ((t.savings_plan_id || t.loan_id) && t.date > todayStr()) return false
       return true
     })
   }, [allTransactions, range, mode])
@@ -70,7 +70,7 @@ export default function Statistics() {
       let income = 0
       let expense = 0
       for (const t of allTransactions) {
-        if (t.date.slice(0, 7) !== m || (t.savings_plan_id && t.date > todayStr())) continue
+      if (t.date.slice(0, 7) !== m || ((t.savings_plan_id || t.loan_id) && t.date > todayStr())) continue
         if (t.type === 'income') income += Number(t.amount)
         else expense += Number(t.amount)
       }

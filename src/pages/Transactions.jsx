@@ -167,11 +167,11 @@ export default function Transactions() {
                   </div>
                   <div className="tx-info">
                     <div className="tx-category">{t.categories?.name || '미분류'}</div>
-                    <div className="tx-memo">{t.memo || t.payment_method}{t.savings_plan_id && (t.date > todayStr() ? ' · 납입 예정' : ' · 자동 등록')}{t.payment_method === '신용카드' && t.card_due_date && ` · ${t.card_due_date} 자동이체`}</div>
+                    <div className="tx-memo">{t.memo || t.payment_method}{(t.savings_plan_id || t.loan_id) && (t.date > todayStr() ? ' · 납입 예정' : ' · 자동 등록')}{t.payment_method === '신용카드' && t.card_due_date && ` · ${t.card_due_date} 자동이체`}</div>
                     <div className="tx-meta">{t.profiles?.name}</div>
                   </div>
                 </div>
-                <span className="tx-list-payment">{t.payment_method === '신용카드' ? `${t.payment_method} · ${cards.find((c) => c.id === t.card_id)?.nickname || '카드 미지정'}` : t.payment_method || '—'}</span>
+                <span className="tx-list-payment">{t.loan_id && t.payment_method === '신용카드' ? '카드 · 대출이자' : t.payment_method === '신용카드' ? `${t.payment_method} · ${cards.find((c) => c.id === t.card_id)?.nickname || '카드 미지정'}` : t.payment_method || '—'}</span>
                 <span className="tx-list-member">{t.profiles?.name || '—'}</span>
                 <div className="tx-row-right">
                   <div className={'tx-amount ' + t.type}>
@@ -179,7 +179,7 @@ export default function Transactions() {
                     {formatWon(t.amount)}
                   </div>
                   <div className="tx-actions">
-                    {!t.savings_plan_id && <>
+                    {!t.savings_plan_id && !t.loan_id && <>
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() => {

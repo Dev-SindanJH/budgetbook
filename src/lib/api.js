@@ -40,6 +40,16 @@ export async function updateSavingsPlan(id, payload) {
   if (error) throw error
 }
 
+export async function addLoan(payload) {
+  const { error } = await supabase.from('loans').insert(payload)
+  if (error) throw error
+}
+
+export async function updateLoan(id, payload) {
+  const { error } = await supabase.from('loans').update(payload).eq('id', id)
+  if (error) throw error
+}
+
 export async function saveStockHolding({ familyId, symbol, market, quantity }) {
   const { error } = await supabase.from('stock_holdings').upsert(
     { family_id: familyId, symbol, market, quantity },
@@ -84,16 +94,17 @@ export async function updateOwnProfile(id, payload) {
 }
 
 export async function fetchAllFamilyData(familyId) {
-  const [{ data: categories }, { data: transactions }, { data: budgets }, { data: creditCards }, { data: cashSettings }, { data: savingsPlans }, { data: stockHoldings }] = await Promise.all([
+  const [{ data: categories }, { data: transactions }, { data: budgets }, { data: creditCards }, { data: cashSettings }, { data: savingsPlans }, { data: loans }, { data: stockHoldings }] = await Promise.all([
     supabase.from('categories').select('*').eq('family_id', familyId),
     supabase.from('transactions').select('*').eq('family_id', familyId),
     supabase.from('budgets').select('*').eq('family_id', familyId),
     supabase.from('credit_cards').select('*').eq('family_id', familyId),
     supabase.from('cash_settings').select('*').eq('family_id', familyId),
     supabase.from('savings_plans').select('*').eq('family_id', familyId),
+    supabase.from('loans').select('*').eq('family_id', familyId),
     supabase.from('stock_holdings').select('*').eq('family_id', familyId),
   ])
-  return { categories: categories || [], transactions: transactions || [], budgets: budgets || [], creditCards: creditCards || [], cashSettings: cashSettings?.[0] || null, savingsPlans: savingsPlans || [], stockHoldings: stockHoldings || [] }
+  return { categories: categories || [], transactions: transactions || [], budgets: budgets || [], creditCards: creditCards || [], cashSettings: cashSettings?.[0] || null, savingsPlans: savingsPlans || [], loans: loans || [], stockHoldings: stockHoldings || [] }
 }
 
 export async function importTransactions(familyId, memberId, transactions) {
@@ -127,6 +138,8 @@ export async function resetFamilyData(familyId) {
   if (stockError) throw stockError
   const { error: e0 } = await supabase.from('savings_plans').delete().eq('family_id', familyId)
   if (e0) throw e0
+  const { error: loanError } = await supabase.from('loans').delete().eq('family_id', familyId)
+  if (loanError) throw loanError
   const { error: e1 } = await supabase.from('transactions').delete().eq('family_id', familyId)
   if (e1) throw e1
   const { error: e2 } = await supabase.from('budgets').delete().eq('family_id', familyId)

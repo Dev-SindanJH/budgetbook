@@ -411,6 +411,7 @@ a {
 
 .credit-card-form,
 .savings-form,
+.loan-form,
 .stock-form {
   display: flex;
   align-items: end;
@@ -421,6 +422,7 @@ a {
 
 .credit-card-form .field,
 .savings-form .field,
+.loan-form .field,
 .stock-form .field {
   flex: 1 1 160px;
   margin-bottom: 0;
@@ -428,6 +430,7 @@ a {
 
 .credit-card-form .btn,
 .savings-form .btn,
+.loan-form .btn,
 .stock-form .btn { min-height: 40px; }
 
 .stock-holding-item { gap: 12px; }
@@ -439,6 +442,7 @@ a {
 @media (max-width: 480px) {
   .credit-card-form .btn,
   .savings-form .btn,
+  .loan-form .btn,
   .stock-form .btn { width: 100%; }
   .credit-card-item { align-items: flex-start; flex-direction: column; }
   .stock-holding-item { align-items: flex-start; flex-direction: column; }

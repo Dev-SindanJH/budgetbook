@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [formType, setFormType] = useState(null)
   const { from, to } = monthRange(month)
   const { transactions: allTransactions, loading, refresh } = useTransactions(family?.id)
-  const transactions = useMemo(() => allTransactions.filter((t) => t.date >= from && t.date <= to && (!t.savings_plan_id || t.date <= todayStr())), [allTransactions, from, to])
+  const transactions = useMemo(() => allTransactions.filter((t) => t.date >= from && t.date <= to && ((!t.savings_plan_id && !t.loan_id) || t.date <= todayStr())), [allTransactions, from, to])
   const { budgets } = useBudgets(family?.id, month)
   const { members } = useProfiles(family?.id)
   const { categories } = useCategories(family?.id)
