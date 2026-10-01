@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: only light;
   --bg: #f3f6fc;
   --surface: rgba(255, 255, 255, 0.86);
   --surface-solid: #fff;
@@ -34,6 +34,9 @@ body,
 #root {
   min-height: 100%;
   margin: 0;
+}
+html {
+  background-color: var(--bg);
 }
 body {
   color: var(--text);

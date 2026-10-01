@@ -1,0 +1,1 @@
+import{r as e,s as f}from"./index-CiccNbgj.js";function l(s){const[a,o]=e.useState([]),[u,t]=e.useState(!0),r=e.useCallback(async()=>{if(!s)return;t(!0);const{data:c,error:n}=await f.from("profiles").select("*").eq("family_id",s).order("created_at");n||o(c||[]),t(!1)},[s]);return e.useEffect(()=>{r()},[r]),{members:a,loading:u,refresh:r}}export{l as u};
