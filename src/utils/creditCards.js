@@ -15,19 +15,3 @@ export function isCreditCardExpense(transaction) {
 export function isImmediateExpense(transaction) {
   return transaction.type === 'expense' && transaction.payment_method !== '신용카드'
 }
-
-export function recordedCashBalance(transactions, settings, asOfDate) {
-  if (!settings || settings.opening_date > asOfDate) return null
-  let balance = Number(settings.opening_balance)
-  for (const t of transactions) {
-    const amount = Number(t.amount)
-    if (t.type === 'income' && t.date >= settings.opening_date && t.date <= asOfDate) {
-      balance += amount
-    } else if (isImmediateExpense(t) && t.date >= settings.opening_date && t.date <= asOfDate) {
-      balance -= amount
-    } else if (isCreditCardExpense(t) && t.card_due_date >= settings.opening_date && t.card_due_date <= asOfDate) {
-      balance -= amount
-    }
-  }
-  return balance
-}

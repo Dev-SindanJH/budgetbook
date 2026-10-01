@@ -2,19 +2,14 @@ import { useSearchParams } from 'react-router-dom'
 import { useUI } from '../context/UIContext'
 import Modal from '../components/Modal'
 import Icon from '../components/Icon'
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useCategories } from '../hooks/useCategories'
 import { useTransactions } from '../hooks/useTransactions'
-import { useBudgets } from '../hooks/useBudgets'
-import { useCashSettings } from '../hooks/useCashSettings'
 import { useCashAssets } from '../hooks/useCashAssets'
 import { useSavingsPlans } from '../hooks/useSavingsPlans'
 import { useLoans } from '../hooks/useLoans'
 import { useStockHoldings } from '../hooks/useStockHoldings'
 import {
-  upsertBudget,
-  saveCashSettings,
   saveCashAsset,
   deleteCashAsset,
   addSavingsPlan,
@@ -29,15 +24,10 @@ import {
 import {
   formatWon,
   monthStr,
-  monthRange,
-  monthLabel,
-  addMonths,
   todayStr,
 } from '../utils/format'
-import { recordedCashBalance } from '../utils/creditCards'
-import { savingsAmounts } from '../utils/savings'
-import BudgetProgressBar from '../components/BudgetProgressBar'
-import ColoringGrid from '../components/ColoringGrid'
+import { cashAssetBalances } from '../utils/cashAssets'
+import { savingsAmounts, totalSavingsPaid } from '../utils/savings'
 
 export default function Budget() {
   const { family, profile } = useAuth()
@@ -48,51 +38,26 @@ export default function Budget() {
     { key: 'savings', label: '적금', icon: 'down' },
     { key: 'stocks', label: '주식', icon: 'chart' },
     { key: 'loans', label: '대출', icon: 'card' },
-    { key: 'budget', label: '월 예산', icon: 'calendar' },
   ]
   const tab = tabs.some((t) => t.key === searchParams.get('tab'))
     ? searchParams.get('tab')
     : 'cash'
-  const [month, setMonth] = useState(() =>
-    /^\d{4}-(0[1-9]|1[0-2])$/.test(searchParams.get('month') || '')
-      ? searchParams.get('month')
-      : monthStr(),
-  )
   const [assetForm, setAssetForm] = useState(null)
-  const { from, to } = monthRange(month)
-
-  const { categories } = useCategories(family?.id)
-  const { transactions: monthTransactions } = useTransactions(family?.id, {
-    from,
-    to,
-  })
-  const transactions = useMemo(
-    () =>
-      monthTransactions.filter(
-        (t) => (!t.savings_plan_id && !t.loan_id) || t.date <= todayStr(),
-      ),
-    [monthTransactions],
-  )
   const {
     transactions: allTransactions,
     loading: transactionsLoading,
+    error: transactionsError,
     refresh: refreshTransactions,
   } = useTransactions(family?.id)
-  const { budgets, refresh } = useBudgets(family?.id, month)
   const {
-    cashSettings,
-    loading: cashSettingsLoading,
-    refresh: refreshCashSettings,
-  } = useCashSettings(family?.id)
-  const {
-    assets: cashAssets,
-    total: cashAssetTotal,
+    assets: storedCashAssets,
     loading: cashAssetsLoading,
     refresh: refreshCashAssets,
     error: cashAssetsError,
   } = useCashAssets(family?.id)
   const {
     plans,
+    loading: plansLoading,
     error: plansError,
     refresh: refreshPlans,
   } = useSavingsPlans(family?.id)
@@ -112,10 +77,6 @@ export default function Budget() {
     refresh: refreshStocks,
   } = useStockHoldings(family?.id)
 
-  const [openingDate, setOpeningDate] = useState(todayStr())
-  const [openingBalance, setOpeningBalance] = useState('')
-  const [cashMessage, setCashMessage] = useState('')
-  const [savingCash, setSavingCash] = useState(false)
   const [cashAssetName, setCashAssetName] = useState('')
   const [cashAssetAmount, setCashAssetAmount] = useState('')
   const [editingCashAssetId, setEditingCashAssetId] = useState(null)
@@ -124,6 +85,7 @@ export default function Budget() {
   const [planName, setPlanName] = useState('')
   const [planAmount, setPlanAmount] = useState('')
   const [planDay, setPlanDay] = useState('1')
+  const [planCashAssetId, setPlanCashAssetId] = useState('')
   const [planStartMonth, setPlanStartMonth] = useState(monthStr())
   const [planMaturity, setPlanMaturity] = useState('')
   const [editingPlanId, setEditingPlanId] = useState(null)
@@ -136,6 +98,7 @@ export default function Budget() {
   const [loanRate, setLoanRate] = useState('')
   const [loanDay, setLoanDay] = useState('1')
   const [loanMethod, setLoanMethod] = useState('현금')
+  const [loanCashAssetId, setLoanCashAssetId] = useState('')
   const [editingLoanId, setEditingLoanId] = useState(null)
   const [loanMessage, setLoanMessage] = useState('')
   const [savingLoan, setSavingLoan] = useState(false)
@@ -145,34 +108,26 @@ export default function Budget() {
   const [stockMessage, setStockMessage] = useState('')
   const [savingStock, setSavingStock] = useState(false)
 
-  useEffect(() => {
-    if (cashSettings) {
-      setOpeningDate(cashSettings.opening_date)
-      setOpeningBalance(String(cashSettings.opening_balance))
-    }
-  }, [cashSettings])
-
-  const currentCash = recordedCashBalance(
-    allTransactions,
-    cashSettings,
-    todayStr(),
-  )
+  const cashAssets = cashAssetBalances(storedCashAssets, allTransactions, todayStr())
+  const cashAssetTotal = cashAssets.reduce((sum, asset) => sum + asset.balance, 0)
 
   async function handleSaveCashAsset(e) {
     e.preventDefault()
     const amount = Number(cashAssetAmount)
-    if (!cashAssetName.trim() || !Number.isFinite(amount) || amount < 0) {
-      setCashAssetMessage('보유처 이름과 0원 이상의 금액을 입력해주세요')
+    if (!cashAssetName.trim() || !Number.isFinite(amount) || cashAssetAmount === '') {
+      setCashAssetMessage('보유처 이름과 금액을 입력해주세요')
       return
     }
     setSavingCashAsset(true)
     setCashAssetMessage('')
     try {
+      const existing = cashAssets.find((asset) => asset.id === editingCashAssetId)
+      const transactionChange = existing ? existing.balance - Number(existing.amount) : 0
       await saveCashAsset({
         id: editingCashAssetId,
         family_id: family.id,
         name: cashAssetName.trim(),
-        amount,
+        amount: amount - transactionChange,
       })
       await refreshCashAssets()
       setCashAssetName('')
@@ -199,40 +154,6 @@ export default function Budget() {
       setCashAssetMessage('현금 항목을 삭제했어요')
     } catch (err) {
       setCashAssetMessage(err.message || '현금 항목을 삭제하지 못했어요')
-    }
-  }
-
-  async function handleSaveCash(e) {
-    e.preventDefault()
-    const amount = Number(openingBalance)
-    if (
-      !openingDate ||
-      openingDate > todayStr() ||
-      openingBalance === '' ||
-      !Number.isFinite(amount) ||
-      amount < 0
-    ) {
-      setCashMessage(
-        '오늘 또는 이전의 기준일과 0원 이상의 보유 현금을 입력해주세요',
-      )
-      return
-    }
-    setSavingCash(true)
-    setCashMessage('')
-    try {
-      await saveCashSettings({
-        family_id: family.id,
-        opening_date: openingDate,
-        opening_balance: amount,
-      })
-      await refreshCashSettings()
-      setCashMessage('보유 현금 기준값을 저장했어요')
-      setAssetForm(null)
-      notify('현금 기준을 저장했어요')
-    } catch (err) {
-      setCashMessage(err.message || '보유 현금을 저장하지 못했어요')
-    } finally {
-      setSavingCash(false)
     }
   }
 
@@ -264,6 +185,7 @@ export default function Budget() {
         debit_day: day,
         start_month: `${planStartMonth}-01`,
         maturity_date: planMaturity || null,
+        cash_asset_id: planCashAssetId || null,
       }
       if (editingPlanId) await updateSavingsPlan(editingPlanId, payload)
       else await addSavingsPlan(payload)
@@ -292,6 +214,7 @@ export default function Budget() {
     setAssetForm('savings')
     setEditingPlanId(plan.id)
     setPlanName(plan.name)
+    setPlanCashAssetId(plan.cash_asset_id || '')
     setPlanAmount(String(plan.monthly_amount))
     setPlanDay(String(plan.debit_day))
     setPlanStartMonth(plan.start_month.slice(0, 7))
@@ -315,6 +238,11 @@ export default function Budget() {
   }
 
   async function handleTogglePlan(plan) {
+    if (!plan.active && !plan.cash_asset_id) {
+      handleEditPlan(plan)
+      setPlanMessage('납입할 보유처를 지정한 뒤 다시 시작해주세요.')
+      return
+    }
     try {
       await updateSavingsPlan(plan.id, { active: !plan.active })
       await Promise.all([refreshPlans(), refreshTransactions()])
@@ -364,6 +292,7 @@ export default function Budget() {
         annual_interest_rate: rate,
         interest_day: day,
         payment_method: loanMethod,
+        cash_asset_id: loanCashAssetId || null,
       }
       if (editingLoanId) await updateLoan(editingLoanId, payload)
       else await addLoan(payload)
@@ -392,6 +321,7 @@ export default function Budget() {
     setAssetForm('loans')
     setEditingLoanId(loan.id)
     setLoanName(loan.name)
+    setLoanCashAssetId(loan.cash_asset_id || '')
     setLoanDate(loan.loan_date)
     setLoanRepaymentDate(loan.repayment_date)
     setLoanAmount(String(loan.principal_amount))
@@ -419,6 +349,11 @@ export default function Budget() {
   }
 
   async function handleToggleLoan(loan) {
+    if (!loan.active && !loan.cash_asset_id) {
+      handleEditLoan(loan)
+      setLoanMessage('이자 출금 보유처를 지정한 뒤 다시 시작해주세요.')
+      return
+    }
     try {
       await updateLoan(loan.id, { active: !loan.active })
       await Promise.all([refreshLoans(), refreshTransactions()])
@@ -482,79 +417,9 @@ export default function Budget() {
     }
   }
 
-  const [drafts, setDrafts] = useState({})
-  const [savingKey, setSavingKey] = useState(null)
-
-  const expenseCategories = categories.filter((c) => c.type === 'expense')
-
-  const spentByCategory = useMemo(() => {
-    const map = {}
-    let total = 0
-    for (const t of transactions) {
-      if (t.type !== 'expense') continue
-      total += Number(t.amount)
-      if (!t.category_id) continue
-      map[t.category_id] = (map[t.category_id] || 0) + Number(t.amount)
-    }
-    return { map, total }
-  }, [transactions])
-
-  const categoryBudgetTotal = budgets
-    .filter((b) => b.category_id)
-    .reduce((sum, b) => sum + Number(b.limit_amount), 0)
-  const categoryBudget = (categoryId) =>
-    budgets.find((b) => b.category_id === categoryId)
-
-  const expenseTransactions = useMemo(
-    () => transactions.filter((t) => t.type === 'expense'),
-    [transactions],
-  )
-
-  function draftValue(key, fallback) {
-    return drafts[key] !== undefined ? drafts[key] : (fallback ?? '')
-  }
-
-  async function handleSave(categoryId, key) {
-    const raw = drafts[key]
-    const amount = Number(raw)
-    if (!raw || amount < 0) return
-    setSavingKey(key)
-    try {
-      await upsertBudget({
-        familyId: family.id,
-        categoryId,
-        month,
-        limitAmount: amount,
-      })
-      await refresh()
-      notify('예산을 저장했어요')
-    } catch (err) {
-      notify(err.message || '예산을 저장하지 못했어요', true)
-    } finally {
-      setSavingKey(null)
-    }
-  }
-
-  const overRows = expenseCategories
-    .map((c) => {
-      const b = categoryBudget(c.id)
-      const spent = spentByCategory.map[c.id] || 0
-      return { c, limit: b ? Number(b.limit_amount) : 0, spent }
-    })
-    .filter((r) => r.limit > 0 && r.spent > r.limit)
-
-  const savingsValue = allTransactions
-    .filter((t) => t.savings_plan_id && t.date <= todayStr())
-    .reduce((sum, t) => sum + Number(t.amount), 0)
-  const assetsLoading =
-    transactionsLoading ||
-    cashSettingsLoading ||
-    cashAssetsLoading ||
-    stocksLoading
-  const totalAssets =
-    (cashAssets.length ? cashAssetTotal : (currentCash ?? 0)) +
-    savingsValue +
-    stockValue
+  const savingsValue = totalSavingsPaid(plans, todayStr())
+  const assetsLoading = transactionsLoading || cashAssetsLoading || plansLoading || stocksLoading
+  const totalAssets = cashAssetTotal + savingsValue + stockValue
   function openAssetForm(kind) {
     if (kind === 'cash') {
       setEditingCashAssetId(null)
@@ -563,6 +428,7 @@ export default function Budget() {
       setCashAssetMessage('')
     }
     if (kind === 'savings') {
+      setPlanCashAssetId('')
       setEditingPlanId(null)
       setPlanName('')
       setPlanAmount('')
@@ -570,6 +436,7 @@ export default function Budget() {
       setPlanMessage('')
     }
     if (kind === 'loans') {
+      setLoanCashAssetId('')
       setEditingLoanId(null)
       setLoanName('')
       setLoanAmount('')
@@ -581,7 +448,6 @@ export default function Budget() {
       setStockQuantity('')
       setStockMessage('')
     }
-    if (kind === 'balance') setCashMessage('')
     setAssetForm(kind)
   }
   return (
@@ -591,29 +457,8 @@ export default function Budget() {
           <div className="eyebrow">GROW TOGETHER</div>
           <h1 className="page-title">차곡차곡, 우리 집 자산</h1>
           <p className="page-description">
-            보유 자산부터 월 예산까지 한곳에서 관리해요.
+            현금, 적금, 주식과 대출을 한곳에서 관리해요.
           </p>
-        </div>
-        <div
-          className="filter-bar"
-          style={{ marginBottom: 0 }}
-          hidden={tab !== 'budget'}
-        >
-          <button
-            className="btn btn-sm"
-            onClick={() => setMonth(addMonths(month, -1))}
-          >
-            ← 이전 달
-          </button>
-          <span className="hint-text" style={{ alignSelf: 'center' }}>
-            {monthLabel(month)}
-          </span>
-          <button
-            className="btn btn-sm"
-            onClick={() => setMonth(addMonths(month, 1))}
-          >
-            다음 달 →
-          </button>
         </div>
       </div>
 
@@ -621,12 +466,12 @@ export default function Budget() {
         <div>
           <span className="summary-label">가족 전체 · 총 보유 자산</span>
           <div className="summary-value">
-            {assetsLoading ? '확인 중…' : formatWon(totalAssets)}
+            {assetsLoading ? '확인 중…' : transactionsError || cashAssetsError || plansError || stocksError ? '일부 조회 실패' : formatWon(totalAssets)}
           </div>
           <span className="hint-text">
             현금 + 적금 납입액 + 확인된 주식 평가액
           </span>
-          {(missingCount > 0 || cashAssetsError || stocksError) && (
+          {(missingCount > 0 || cashAssetsError || plansError || stocksError) && (
             <p className="hint-text">
               일부 정보를 확인하지 못해 합계에서 제외했어요.
             </p>
@@ -636,11 +481,7 @@ export default function Budget() {
           <div>
             <span>현금</span>
             <strong>
-              {cashAssets.length
-                ? formatWon(cashAssetTotal)
-                : currentCash === null
-                  ? '기준 미설정'
-                  : formatWon(currentCash)}
+              {formatWon(cashAssetTotal)}
             </strong>
           </div>
           <div>
@@ -674,7 +515,7 @@ export default function Budget() {
             className={'btn' + (tab === item.key ? ' active' : '')}
             key={item.key}
             aria-pressed={tab === item.key}
-            onClick={() => setSearchParams({ tab: item.key, month })}
+            onClick={() => setSearchParams({ tab: item.key })}
           >
             <Icon name={item.icon} size={18} />
             {item.label}
@@ -688,10 +529,9 @@ export default function Budget() {
             {formatWon(cashAssetTotal)}
           </div>
           <div className="hint-text" style={{ marginBottom: 12 }}>
-            전세금, 통장 잔액처럼 보유 현금을 항목별로 등록해요. 홈에는 항목의
-            합계가 표시돼요.
+            통장과 현금을 보유처별로 등록해요. 새 수입·지출은 선택한 보유처에 반영돼요. 기존 거래는 현재 잔액에 포함되어 다시 반영하지 않아요.
           </div>
-          {cashAssetsError && (
+          {(cashAssetsError || transactionsError) && (
             <div className="error-text">
               현금 항목을 불러오지 못했어요. 잠시 후 다시 시도해주세요.
             </div>
@@ -700,7 +540,7 @@ export default function Budget() {
             <div className="settings-list-item" key={asset.id}>
               <div>
                 <strong>{asset.name}</strong>
-                <div className="hint-text">{formatWon(asset.amount)}</div>
+                <div className="hint-text">{formatWon(asset.balance)}</div>
               </div>
               <div className="stock-holding-actions">
                 <button
@@ -710,7 +550,7 @@ export default function Budget() {
                     setAssetForm('cash')
                     setEditingCashAssetId(asset.id)
                     setCashAssetName(asset.name)
-                    setCashAssetAmount(String(asset.amount))
+                    setCashAssetAmount(String(asset.balance))
                     setCashAssetMessage('')
                   }}
                 >
@@ -762,10 +602,10 @@ export default function Budget() {
                 </div>
                 <div className="field">
                   <label htmlFor="cash-asset-amount">금액 (원)</label>
+                  <span className="hint-text">현재 잔액을 입력해주세요. 이전 거래를 다시 더하거나 빼지 않아요.</span>
                   <input
                     id="cash-asset-amount"
                     type="number"
-                    min="0"
                     value={cashAssetAmount}
                     onChange={(e) => setCashAssetAmount(e.target.value)}
                     required
@@ -807,90 +647,6 @@ export default function Budget() {
           )}
         </div>
 
-        <div className="card">
-          <div className="section-title">거래 기준 현금 잔액</div>
-          <div className="summary-value" style={{ marginBottom: 8 }}>
-            {currentCash === null
-              ? '기준 금액을 입력해주세요'
-              : formatWon(currentCash)}
-          </div>
-          <div className="hint-text" style={{ marginBottom: 12 }}>
-            기준일 아침의 현금을 입력하면 이후 수입, 현금 지출, 적금 납입,
-            신용카드 자동이체를 날짜에 맞춰 더하고 빼요.
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ marginTop: 18 }}
-            onClick={() => openAssetForm('balance')}
-          >
-            <Icon name="plus" size={18} />
-            현금 기준 설정
-          </button>
-          {assetForm === 'balance' && (
-            <Modal
-              title="현금 기준 설정"
-              onClose={() => setAssetForm(null)}
-              busy={savingCash}
-              className="transaction-modal"
-            >
-              <form className="asset-form" onSubmit={handleSaveCash}>
-                <div className="field">
-                  <label htmlFor="asset-opening-date">기준일</label>
-                  <input
-                    data-autofocus
-                    id="asset-opening-date"
-                    type="date"
-                    max={todayStr()}
-                    value={openingDate}
-                    onChange={(e) => setOpeningDate(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="asset-opening-balance">
-                    그날 아침 보유 현금
-                  </label>
-                  <input
-                    id="asset-opening-balance"
-                    type="number"
-                    min="0"
-                    value={openingBalance}
-                    onChange={(e) => setOpeningBalance(e.target.value)}
-                    required
-                  />
-                </div>
-                {cashMessage && (
-                  <div className="hint-text" role="status">
-                    {cashMessage}
-                  </div>
-                )}
-                <div className="asset-form-actions">
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={savingCash}
-                    onClick={() => setAssetForm(null)}
-                  >
-                    취소
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    type="submit"
-                    disabled={savingCash}
-                  >
-                    {savingCash ? '저장 중...' : '현금 저장'}
-                  </button>
-                </div>
-              </form>
-            </Modal>
-          )}
-          {cashMessage && (
-            <div className="hint-text" role="status">
-              {cashMessage}
-            </div>
-          )}
-        </div>
       </div>
       <div className="asset-tab-content" hidden={tab !== 'stocks'}>
         <div className="card">
@@ -1098,6 +854,7 @@ export default function Budget() {
                       ? `만기 ${plan.maturity_date}`
                       : '만기 없음'}
                     {!plan.active && ' · 중지'}
+                    <div className="hint-text">{cashAssets.find((asset) => asset.id === plan.cash_asset_id)?.name || '보유처 미지정 · 수정에서 납입할 보유처를 선택해주세요'}</div>
                   </div>
                   <div className="savings-amounts">
                     <span>
@@ -1161,6 +918,14 @@ export default function Budget() {
               className="transaction-modal"
             >
               <form className="asset-form" onSubmit={handleSavePlan}>
+                <div className="field">
+                  <label htmlFor="savings-cash-asset">납입할 보유처</label>
+                  <select id="savings-cash-asset" value={planCashAssetId} onChange={(e) => setPlanCashAssetId(e.target.value)} required>
+                    <option value="">보유처를 선택하세요</option>
+                    {cashAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                  </select>
+                  <span className="hint-text">새로 생성하는 납입부터 반영해요. 기존 내역은 다시 차감하지 않아요.</span>
+                </div>
                 <div className="field">
                   <label htmlFor="savings-name">적금 이름</label>
                   <input
@@ -1278,6 +1043,7 @@ export default function Budget() {
                 일 {loan.payment_method === '현금' ? '현금' : '카드'} · 상환{' '}
                 {loan.repayment_date}
                 {!loan.active && ' · 중지'}
+                <span className="hint-text" style={{ display: 'block' }}>{cashAssets.find((asset) => asset.id === loan.cash_asset_id)?.name || '보유처 미지정 · 수정에서 이자 출금 보유처를 선택해주세요'}</span>
               </span>
               <div className="stock-holding-actions">
                 <button
@@ -1321,6 +1087,13 @@ export default function Budget() {
               className="transaction-modal"
             >
               <form className="asset-form" onSubmit={handleSaveLoan}>
+                <div className="field">
+                  <label htmlFor="loan-cash-asset">이자 출금 보유처</label>
+                  <select id="loan-cash-asset" value={loanCashAssetId} onChange={(e) => setLoanCashAssetId(e.target.value)} required>
+                    <option value="">보유처를 선택하세요</option>
+                    {cashAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                  </select>
+                </div>
                 <div className="field">
                   <label htmlFor="loan-name">대출 이름</label>
                   <input
@@ -1435,109 +1208,6 @@ export default function Budget() {
               {loanMessage}
             </div>
           )}
-        </div>
-      </div>
-      <div className="asset-tab-content" hidden={tab !== 'budget'}>
-        {overRows.length > 0 && (
-          <div className="card" style={{ borderColor: '#fecaca' }}>
-            <div className="section-title" style={{ color: 'var(--danger)' }}>
-              예산을 초과했어요
-            </div>
-            {overRows.map(({ c, limit, spent }) => (
-              <div key={c.id} style={{ marginBottom: 12 }}>
-                <BudgetProgressBar
-                  spent={spent}
-                  limit={limit}
-                  label={`${c.icon} ${c.name}`}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="card">
-          <div className="section-title">색칠 가계부</div>
-          <ColoringGrid
-            transactions={expenseTransactions}
-            overallLimit={categoryBudgetTotal}
-            spent={spentByCategory.total}
-          />
-        </div>
-
-        <div className="card">
-          <div className="section-title">카테고리별 월 예산</div>
-          <div className="budget-category-grid">
-            {expenseCategories.map((c) => {
-              const b = categoryBudget(c.id)
-              const spent = spentByCategory.map[c.id] || 0
-              const key = c.id
-              return (
-                <div key={c.id} className="budget-category-item">
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <span style={{ fontWeight: 600 }}>
-                      {c.icon} {c.name}
-                    </span>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 8,
-                        flex: '1 1 200px',
-                        maxWidth: 260,
-                      }}
-                    >
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="예산 금액"
-                        aria-label={`${c.name} 월 예산`}
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          border: '1px solid var(--border)',
-                          borderRadius: 8,
-                          padding: '6px 10px',
-                        }}
-                        value={draftValue(key, b?.limit_amount)}
-                        onChange={(e) =>
-                          setDrafts((d) => ({ ...d, [key]: e.target.value }))
-                        }
-                      />
-                      <button
-                        className="btn btn-sm btn-primary"
-                        disabled={savingKey === key}
-                        onClick={() => handleSave(c.id, key)}
-                      >
-                        저장
-                      </button>
-                    </div>
-                  </div>
-                  {b ? (
-                    <BudgetProgressBar
-                      spent={spent}
-                      limit={Number(b.limit_amount)}
-                      label=""
-                      sub={`${formatWon(spent)} / ${formatWon(b.limit_amount)}`}
-                    />
-                  ) : (
-                    spent > 0 && (
-                      <div className="hint-text">
-                        {formatWon(spent)} 지출 (예산 미설정)
-                      </div>
-                    )
-                  )}
-                </div>
-              )
-            })}
-          </div>
         </div>
       </div>
     </div>

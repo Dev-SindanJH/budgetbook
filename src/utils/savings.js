@@ -16,3 +16,7 @@ export function savingsAmounts(plan, today) {
   const paid = installmentsThrough(plan, today) * monthlyAmount
   return { total, paid, remaining: total === null ? null : total - paid }
 }
+
+export function totalSavingsPaid(plans, today) {
+  return plans.reduce((sum, plan) => sum + savingsAmounts(plan, today).paid, 0)
+}

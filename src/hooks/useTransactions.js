@@ -6,6 +6,7 @@ let nextTransactionChannelId = 0
 export function useTransactions(familyId, { from, to } = {}) {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
 
   const refresh = useCallback(async () => {
     if (!familyId) return
@@ -31,6 +32,7 @@ export function useTransactions(familyId, { from, to } = {}) {
       offset += result.data?.length || 0
       if ((result.data?.length || 0) < 1000) break
     } while (true)
+    setFetchError(error)
     if (!error) setTransactions(all)
     setLoading(false)
   }, [familyId, from, to])
@@ -60,5 +62,5 @@ export function useTransactions(familyId, { from, to } = {}) {
     }
   }, [familyId])
 
-  return { transactions, loading, refresh }
+  return { transactions, loading, error: fetchError, refresh }
 }

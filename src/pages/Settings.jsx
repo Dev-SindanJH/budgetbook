@@ -256,7 +256,7 @@ export default function Settings() {
   async function handleReset() {
     if (
       !(await confirm(
-        '모든 거래·예산·적금·대출·보유 주식 데이터가 삭제돼요. 이 작업은 되돌릴 수 없어요.',
+        '모든 거래·현금·적금·대출·보유 주식 데이터가 삭제돼요. 이 작업은 되돌릴 수 없어요.',
         { title: '데이터를 초기화할까요?', confirmLabel: '계속' },
       ))
     )

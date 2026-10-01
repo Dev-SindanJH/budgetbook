@@ -114,7 +114,10 @@ async function close() {
 }
 try {
   await go()
-  await page.getByText('1,350,000원', { exact: true }).waitFor()
+  await page.locator('.hero-amount').getByText('650,000원', { exact: true }).waitFor()
+  const expectedSavings = (new Date().getMonth() + 1) * 200000
+  const expectedAssets = (6250000 + 1560000 + expectedSavings).toLocaleString('ko-KR') + '원'
+  await page.locator('.asset-strip-value').getByText(expectedAssets, { exact: true }).waitFor()
   await noOverflow('desktop home')
   await shot('desktop-home')
   await page.getByRole('button', { name: '지출 기록', exact: true }).click()
@@ -126,6 +129,7 @@ try {
   await page.getByLabel('금액 (원)').fill('18000')
   await page.getByLabel('결제수단', { exact: true }).selectOption('신용카드')
   await page.getByLabel('사용한 신용카드').selectOption('card-1')
+  await page.getByLabel('카드 결제대금 출금 보유처').selectOption('cash-1')
   await shot('desktop-transaction-modal')
   // A failed save must preserve the values and keep the dialog open.
   await page.evaluate(() => {
@@ -145,15 +149,30 @@ try {
     ),
     2,
   )
+  assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].cash_asset_id), 'cash-1')
+  assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].cash_balance_included), true)
+  await page.getByRole('button', { name: '수입 기록', exact: true }).click()
+  await page.getByLabel('금액 (원)').fill('100000')
+  await page.getByRole('button', { name: '기록하기', exact: true }).click()
+  assert.equal(await page.getByRole('dialog').count(), 1, 'new income requires a cash account')
+  await page.getByLabel('입금할 보유처').selectOption('cash-1')
+  await page.getByRole('button', { name: '기록하기', exact: true }).click()
+  await page.locator('dialog').waitFor({ state: 'detached' })
+  assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].type), 'income')
   await page.getByLabel('조회할 구성원').selectOption('member-2')
   await page
-    .getByText('선택한 구성원의 지출이에요. 예산은 가족 전체 기준이에요.')
+    .getByText('선택한 구성원의 지출이에요.')
     .waitFor()
   await page.getByLabel('조회할 구성원').selectOption('all')
   await page.getByRole('button', { name: /카드 결제 일정/ }).click()
   await shot('card-schedule')
   await close()
   await go('/transactions')
+  await page.getByRole('button', { name: '수정', exact: true }).first().click()
+  await page.getByText('기존 잔액에 포함된 내역이에요.', { exact: false }).waitFor()
+  await page.getByRole('button', { name: '수정 완료' }).click()
+  await page.locator('dialog').waitFor({ state: 'detached' })
+  assert.equal(await page.evaluate(() => window.__calls.at(-1).args[1].cash_balance_included), false)
   await page.getByRole('button', { name: '삭제', exact: true }).first().click()
   await page.getByRole('dialog', { name: '이 내역을 삭제할까요?' }).waitFor()
   await page.getByRole('button', { name: '취소', exact: true }).click()
@@ -186,6 +205,8 @@ try {
     await shot(`modal-${tab}`)
     const dialog = page.getByRole('dialog')
     for (const [label, value] of Object.entries(fields)) await dialog.getByLabel(label, { exact: true }).fill(value)
+    if (tab === 'savings') await dialog.getByLabel('납입할 보유처').selectOption('cash-1')
+    if (tab === 'loans') await dialog.getByLabel('이자 출금 보유처').selectOption('cash-1')
     await page.evaluate(() => { window.__failSave = true })
     await dialog.getByRole('button', { name: submit, exact: true }).click()
     await dialog.getByText('테스트: 저장에 실패했어요. 다시 시도해주세요.', { exact: true }).waitFor()
@@ -205,14 +226,12 @@ try {
     await page.getByRole('dialog').waitFor()
     await close()
   }
-  await go('/budget?tab=cash')
-  await page
-    .getByRole('button', { name: '현금 기준 설정', exact: true })
-    .click()
-  await shot('modal-balance')
-  await close()
   await go('/budget?tab=budget')
-  await shot('desktop-budget')
+  await page.locator('.asset-overview .summary-value').getByText(expectedAssets, { exact: true }).waitFor()
+  await page.locator('.asset-overview-detail').getByText(expectedSavings.toLocaleString('ko-KR') + '원', { exact: true }).waitFor()
+  assert.equal(await page.getByText('카테고리별 월 예산').count(), 0)
+  assert.equal(await page.getByText('거래 기준 현금 잔액').count(), 0)
+  await page.getByText('보유 현금 항목', { exact: true }).waitFor()
   await go('/settings')
   await shot('desktop-settings')
   await page
@@ -284,7 +303,7 @@ try {
     await close()
     assert.equal(await page.locator(':focus').textContent(), '지출 기록')
   }
-  for (const scenario of ['empty', 'over', 'long', 'loading']) {
+  for (const scenario of ['empty', 'long', 'loading']) {
     await page.setViewportSize({ width: 320, height: 844 })
     await go('/', scenario)
     await noOverflow(scenario)
@@ -305,7 +324,7 @@ try {
   await page.getByLabel('초대 코드').waitFor()
   assert.deepEqual(errors, [], `Runtime errors: ${errors.join('\n')}`)
   console.log(
-    'PASS: responsive routes, all editor/confirmation dialogs, failed saves, cancel safety, modal focus, auth states, empty/over-budget/long/loading states. Screenshots: ' +
+    'PASS: responsive routes, all editor/confirmation dialogs, failed saves, cancel safety, modal focus, auth states, empty/long/loading states. Screenshots: ' +
       output,
   )
 } finally {

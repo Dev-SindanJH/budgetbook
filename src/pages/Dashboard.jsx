@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
 import { useTransactions } from '../hooks/useTransactions'
-import { useBudgets } from '../hooks/useBudgets'
 import { useProfiles } from '../hooks/useProfiles'
 import { useCategories } from '../hooks/useCategories'
 import { useCreditCards } from '../hooks/useCreditCards'
-import { useCashSettings } from '../hooks/useCashSettings'
+import { cashAssetBalances } from '../utils/cashAssets'
+import { totalSavingsPaid } from '../utils/savings'
+import { useSavingsPlans } from '../hooks/useSavingsPlans'
 import { useCashAssets } from '../hooks/useCashAssets'
 import { useStockHoldings } from '../hooks/useStockHoldings'
 import { addTransaction } from '../lib/api'
@@ -23,7 +24,6 @@ import { getDashboardPrefs } from '../lib/dashboardPrefs'
 import {
   isCreditCardExpense,
   isImmediateExpense,
-  recordedCashBalance,
 } from '../utils/creditCards'
 import CategoryDonutChart from '../components/CategoryDonutChart'
 import DashboardCalendar from '../components/DashboardCalendar'
@@ -43,18 +43,14 @@ export default function Dashboard() {
   const {
     transactions: allTransactions,
     loading,
+    error: transactionsError,
     refresh,
   } = useTransactions(family?.id)
-  const { budgets, loading: budgetLoading } = useBudgets(family?.id, month)
   const { members } = useProfiles(family?.id)
   const { categories } = useCategories(family?.id)
   const { cards } = useCreditCards(family?.id)
-  const { cashSettings, loading: cashSettingsLoading } = useCashSettings(
-    family?.id,
-  )
   const {
     assets: cashAssets,
-    total: cashAssetTotal,
     loading: cashLoading,
     error: cashError,
   } = useCashAssets(family?.id)
@@ -85,20 +81,12 @@ export default function Dashboard() {
   const income = transactions
     .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + Number(t.amount), 0)
-  const limit = budgets
-    .filter((b) => b.category_id)
-    .reduce((sum, b) => sum + Number(b.limit_amount), 0)
-  const hasBudget = limit > 0 && member === 'all'
-  const remaining = limit - expense
-  const ready = !loading && !budgetLoading
-  const currentCash = recordedCashBalance(allTransactions, cashSettings, today)
-  const cashValue = cashAssets.length ? cashAssetTotal : currentCash
-  const savingsValue = allTransactions
-    .filter((t) => t.savings_plan_id && t.date <= today)
-    .reduce((sum, t) => sum + Number(t.amount), 0)
-  const totalAssets = (cashValue ?? 0) + savingsValue + stockValue
-  const assetsLoading =
-    loading || cashLoading || cashSettingsLoading || stockLoading
+  const ready = !loading
+  const { plans, loading: plansLoading, error: plansError } = useSavingsPlans(family?.id)
+  const cashValue = cashAssetBalances(cashAssets, allTransactions, today).reduce((sum, asset) => sum + asset.balance, 0)
+  const savingsValue = totalSavingsPaid(plans, today)
+  const totalAssets = cashValue + savingsValue + stockValue
+  const assetsLoading = loading || cashLoading || plansLoading || stockLoading
   const dueGroups = useMemo(() => {
     const map = {}
     const end = monthRange(addMonths(month, 1)).to
@@ -230,64 +218,18 @@ export default function Dashboard() {
       <div className="home-grid">
         <section className="hero-card">
           <div className="hero-heading">
-            <span className="eyebrow">MONTHLY BUDGET</span>
+            <span className="eyebrow">MONTHLY SPENDING</span>
             <span className="soft-badge">
               {member === 'all'
                 ? '가족 전체'
                 : members.find((m) => m.id === member)?.name}
             </span>
           </div>
-          <div className="hero-label">
-            {hasBudget
-              ? remaining < 0
-                ? '이번 달 예산 초과'
-                : '이번 달 남은 예산'
-              : '이번 달 지출'}
+          <div className="hero-label">이번 달 지출</div>
+          <div className={`hero-amount${expense >= 10000000000 ? ' amount-long' : ''}`}>
+            {ready ? formatWon(expense) : '확인 중…'}
           </div>
-          <div
-            className={`hero-amount${hasBudget && remaining < 0 ? ' over' : ''}${Math.abs(hasBudget ? remaining : expense) >= 10000000000 ? ' amount-long' : ''}`}
-          >
-            {ready
-              ? formatWon(hasBudget ? Math.abs(remaining) : expense)
-              : '확인 중…'}
-          </div>
-          <p className="hero-description">
-            {!ready
-              ? '이번 달 기록을 정리하고 있어요.'
-              : hasBudget
-                ? remaining < 0
-                  ? '예산을 넘겼어요. 지출을 함께 살펴볼까요?'
-                  : '우리의 계획 안에서 차근차근 쓰고 있어요.'
-                : member !== 'all'
-                  ? '선택한 구성원의 지출이에요. 예산은 가족 전체 기준이에요.'
-                  : '예산을 정하면 남은 금액을 한눈에 볼 수 있어요.'}
-          </p>
-          {hasBudget && ready && (
-            <div className="hero-progress">
-              <div
-                className="progress-track"
-                role="progressbar"
-                aria-label="이번 달 예산 사용률"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.min(
-                  100,
-                  Math.round((expense / limit) * 100),
-                )}
-              >
-                <div
-                  className={`progress-fill${remaining < 0 ? ' over' : ''}`}
-                  style={{
-                    width: `${Math.min(100, (expense / limit) * 100)}%`,
-                  }}
-                />
-              </div>
-              <div className="progress-caption">
-                <span>{formatWon(expense)} 사용</span>
-                <span>예산 {formatWon(limit)}</span>
-              </div>
-            </div>
-          )}
+          <p className="hero-description">{!ready ? '이번 달 기록을 정리하고 있어요.' : member !== 'all' ? '선택한 구성원의 지출이에요.' : '이번 달 우리 집의 지출을 확인해보세요.'}</p>
           <div className="hero-actions">
             <button
               className="btn btn-primary"
@@ -303,24 +245,7 @@ export default function Dashboard() {
               <Icon name="plus" size={18} />
               수입 기록
             </button>
-            <Link
-              className="text-link"
-              to={`/budget?tab=budget&month=${month}`}
-            >
-              {hasBudget ? '예산 관리' : '예산 설정'}
-              <Icon name="right" size={16} />
-            </Link>
           </div>
-          {hasBudget && (
-            <details className="budget-basis">
-              <summary>예산 계산 기준</summary>
-              <p>
-                카테고리 예산의 합계에서 모든 지출을 뺀 금액이에요. 예산을
-                설정하지 않은 카테고리와 미분류 지출도 포함해요. 보유 현금이나
-                출금 가능 금액과는 달라요.
-              </p>
-            </details>
-          )}
         </section>
         <aside className="home-side">
           <section
@@ -409,15 +334,14 @@ export default function Dashboard() {
           <span className="asset-strip-value">
             {assetsLoading
               ? '확인 중…'
-              : cashError || stockError
+              : transactionsError || cashError || plansError || stockError
                 ? '일부 조회 실패'
                 : formatWon(totalAssets)}
             <Icon name="right" size={18} />
           </span>
-          {!assetsLoading && (missingCount > 0 || cashValue === null) && (
+          {!assetsLoading && missingCount > 0 && (
             <span className="asset-note hint-text">
               {missingCount > 0 ? `시세 미확인 ${missingCount}종목 제외. ` : ''}
-              {cashValue === null ? '현금 기준 미설정.' : ''}
             </span>
           )}
         </Link>
@@ -488,27 +412,15 @@ export default function Dashboard() {
             </span>
             <Icon name="right" size={16} />
           </Link>
-          <Link to={`/budget?tab=budget&month=${month}`}>
-            <span className="section-icon">
-              <Icon name="chart" />
-            </span>
-            <span>
-              <strong>우리 집 예산</strong>
-              <small>카테고리 예산과 색칠 가계부</small>
-            </span>
-            <Icon name="right" size={16} />
-          </Link>
           {prefs.budget && (
             <div className="cash-mini">
               <span>가족 전체 보유 현금</span>
               <strong>
-                {cashLoading || cashSettingsLoading
+                {cashLoading || loading
                   ? '확인 중…'
-                  : cashError
+                  : cashError || transactionsError
                     ? '조회 실패'
-                    : cashValue === null
-                      ? '기준 미설정'
-                      : formatWon(cashValue)}
+                    : formatWon(cashValue)}
               </strong>
             </div>
           )}
@@ -554,7 +466,6 @@ export default function Dashboard() {
                 <h2 className="section-title">색칠 가계부</h2>
                 <ColoringGrid
                   transactions={expenseTransactions}
-                  overallLimit={member === 'all' ? limit : 0}
                   spent={expense}
                 />
               </section>
@@ -620,6 +531,7 @@ export default function Dashboard() {
         <TransactionForm
           categories={categories}
           cards={cards}
+          cashAssets={cashAssets}
           members={members}
           currentMemberId={profile?.id}
           defaultType={formType}

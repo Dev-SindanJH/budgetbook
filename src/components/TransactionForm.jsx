@@ -10,6 +10,7 @@ export default function TransactionForm({
   categories,
   members,
   cards = [],
+  cashAssets = [],
   currentMemberId,
   initial,
   defaultType = 'expense',
@@ -29,6 +30,8 @@ export default function TransactionForm({
     initial?.member_id || currentMemberId || '',
   )
   const [cardId, setCardId] = useState(initial?.card_id || '')
+  const [cashAssetId, setCashAssetId] = useState(initial?.cash_asset_id || '')
+  const affectsCash = !initial || initial.cash_balance_included === true
   const [memo, setMemo] = useState(initial?.memo || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -70,6 +73,10 @@ export default function TransactionForm({
       setError('등록된 신용카드를 선택해주세요')
       return
     }
+    if (affectsCash && !cashAssets.some((asset) => asset.id === cashAssetId)) {
+      setError('잔액을 반영할 현금 보유처를 선택해주세요')
+      return
+    }
     setBusy(true)
     try {
       await onSubmit({
@@ -81,6 +88,8 @@ export default function TransactionForm({
         card_id:
           type === 'expense' && paymentMethod === '신용카드' ? cardId : null,
         member_id: memberId,
+        cash_asset_id: cashAssetId || null,
+        cash_balance_included: affectsCash,
         memo: memo || null,
       })
       onClose()
@@ -215,6 +224,19 @@ export default function TransactionForm({
           )}
 
           <div className="field">
+            <label htmlFor="transaction-cash-asset">
+              {type === 'income' ? '입금할 보유처' : paymentMethod === '신용카드' ? '카드 결제대금 출금 보유처' : '출금할 보유처'}
+            </label>
+            <select id="transaction-cash-asset" value={cashAssetId}
+              onChange={(e) => setCashAssetId(e.target.value)} required={affectsCash}>
+              <option value="">보유처를 선택하세요</option>
+              {cashAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+            </select>
+            {!cashAssets.length && <span className="hint-text"><Link to="/budget?tab=cash" onClick={onClose}>자산에서 현금 보유처 등록하기</Link></span>}
+            {!affectsCash && <span className="hint-text">기존 잔액에 포함된 내역이에요. 수정하거나 삭제해도 현금 잔액을 다시 계산하지 않아요.</span>}
+          </div>
+
+          <div className="field">
             <label htmlFor="transaction-member">작성자</label>
             <select
               id="transaction-member"
@@ -243,7 +265,7 @@ export default function TransactionForm({
           </div>
         </div>
 
-        {type === 'expense' && (
+        {type === 'expense' && affectsCash && (
           <div className="payment-explainer">
             {paymentMethod === '신용카드'
               ? previewDueDate

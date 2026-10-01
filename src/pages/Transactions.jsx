@@ -8,6 +8,7 @@ import { useTransactions } from '../hooks/useTransactions'
 import { useCategories } from '../hooks/useCategories'
 import { useProfiles } from '../hooks/useProfiles'
 import { useCreditCards } from '../hooks/useCreditCards'
+import { useCashAssets } from '../hooks/useCashAssets'
 import {
   addTransaction,
   updateTransaction,
@@ -64,6 +65,7 @@ export default function Transactions() {
   const { categories } = useCategories(family?.id)
   const { members } = useProfiles(family?.id)
   const { cards } = useCreditCards(family?.id)
+  const { assets: cashAssets } = useCashAssets(family?.id)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -280,7 +282,10 @@ export default function Transactions() {
                               t.card_due_date &&
                               ` · ${t.card_due_date} 자동이체`}
                           </div>
-                          <div className="tx-meta">{t.profiles?.name}</div>
+                          <div className="tx-meta">
+                            {t.profiles?.name} · {cashAssets.find((asset) => asset.id === t.cash_asset_id)?.name || '보유처 미지정'}
+                            {t.cash_balance_included === false && ' · 기존 잔액에 포함'}
+                          </div>
                         </div>
                       </div>
                       <span className="tx-list-payment">
@@ -372,6 +377,7 @@ export default function Transactions() {
         <TransactionForm
           categories={categories}
           cards={cards}
+          cashAssets={cashAssets}
           members={members}
           currentMemberId={profile?.id}
           initial={editing}

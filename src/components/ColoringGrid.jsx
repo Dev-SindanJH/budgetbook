@@ -56,7 +56,7 @@ function decomposeRange(startIndex, endIndex, columns) {
   return blocks
 }
 
-export default function ColoringGrid({ transactions, overallLimit, spent }) {
+export default function ColoringGrid({ transactions, spent }) {
   const wrapRef = useRef(null)
   const [cellHeight, setCellHeight] = useState(MAX_CELL_HEIGHT)
 
@@ -80,12 +80,9 @@ export default function ColoringGrid({ transactions, overallLimit, spent }) {
   }, [])
 
   const totalCells = useMemo(() => {
-    const limit =
-      overallLimit > 0
-        ? overallLimit
-        : Math.max(Math.ceil((spent * 1.2) / UNIT) * UNIT, UNIT * 10)
+    const limit = Math.max(Math.ceil((spent * 1.2) / UNIT) * UNIT, UNIT * 10)
     return Math.max(Math.ceil(limit / UNIT), 1)
-  }, [overallLimit, spent])
+  }, [spent])
 
   const totalRows = Math.ceil(totalCells / COLUMNS)
 

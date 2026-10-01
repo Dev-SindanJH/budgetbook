@@ -25,11 +25,6 @@ export async function updateCreditCard(id, payload) {
   if (error) throw error
 }
 
-export async function saveCashSettings(payload) {
-  const { error } = await supabase.from('cash_settings').upsert(payload, { onConflict: 'family_id' })
-  if (error) throw error
-}
-
 export async function saveCashAsset({ id, family_id, name, amount }) {
   const query = id
     ? supabase.from('cash_assets').update({ name, amount }).eq('id', id)
@@ -40,6 +35,7 @@ export async function saveCashAsset({ id, family_id, name, amount }) {
 
 export async function deleteCashAsset(id) {
   const { error } = await supabase.from('cash_assets').delete().eq('id', id)
+  if (error?.code === '23503') throw new Error('거래나 자동납입에 연결된 보유처는 삭제할 수 없어요. 연결된 보유처를 먼저 변경해주세요.')
   if (error) throw error
 }
 
@@ -101,33 +97,23 @@ export async function deleteCategory(id) {
   if (error) throw error
 }
 
-export async function upsertBudget({ familyId, categoryId, month, limitAmount }) {
-  const { error } = await supabase
-    .from('budgets')
-    .upsert(
-      { family_id: familyId, category_id: categoryId ?? null, month, limit_amount: limitAmount },
-      { onConflict: 'family_id,category_key,month' },
-    )
-  if (error) throw error
-}
-
 export async function updateOwnProfile(id, payload) {
   const { error } = await supabase.from('profiles').update(payload).eq('id', id)
   if (error) throw error
 }
 
 export async function fetchAllFamilyData(familyId) {
-  const [{ data: categories }, { data: transactions }, { data: budgets }, { data: creditCards }, { data: cashSettings }, { data: savingsPlans }, { data: loans }, { data: stockHoldings }] = await Promise.all([
+  const [{ data: categories }, { data: transactions }, { data: cashAssets }, { data: creditCards }, { data: cashSettings }, { data: savingsPlans }, { data: loans }, { data: stockHoldings }] = await Promise.all([
     supabase.from('categories').select('*').eq('family_id', familyId),
     supabase.from('transactions').select('*').eq('family_id', familyId),
-    supabase.from('budgets').select('*').eq('family_id', familyId),
+    supabase.from('cash_assets').select('*').eq('family_id', familyId),
     supabase.from('credit_cards').select('*').eq('family_id', familyId),
     supabase.from('cash_settings').select('*').eq('family_id', familyId),
     supabase.from('savings_plans').select('*').eq('family_id', familyId),
     supabase.from('loans').select('*').eq('family_id', familyId),
     supabase.from('stock_holdings').select('*').eq('family_id', familyId),
   ])
-  return { categories: categories || [], transactions: transactions || [], budgets: budgets || [], creditCards: creditCards || [], cashSettings: cashSettings?.[0] || null, savingsPlans: savingsPlans || [], loans: loans || [], stockHoldings: stockHoldings || [] }
+  return { categories: categories || [], transactions: transactions || [], cashAssets: cashAssets || [], creditCards: creditCards || [], cashSettings: cashSettings?.[0] || null, savingsPlans: savingsPlans || [], loans: loans || [], stockHoldings: stockHoldings || [] }
 }
 
 export async function importTransactions(familyId, memberId, transactions) {
@@ -150,6 +136,9 @@ export async function importTransactions(familyId, memberId, transactions) {
     payment_method: t.payment_method ?? null,
     card_id: t.card_id ?? null,
     memo: t.memo ?? null,
+    cash_asset_id: t.cash_asset_id ?? null,
+    // A backup is historical data, not a new cash movement.
+    cash_balance_included: false,
   }))
   if (rows.length === 0) return
   const { error } = await supabase.from('transactions').insert(rows)
@@ -157,8 +146,6 @@ export async function importTransactions(familyId, memberId, transactions) {
 }
 
 export async function resetFamilyData(familyId) {
-  const { error: cashAssetError } = await supabase.from('cash_assets').delete().eq('family_id', familyId)
-  if (cashAssetError) throw cashAssetError
   const { error: stockError } = await supabase.from('stock_holdings').delete().eq('family_id', familyId)
   if (stockError) throw stockError
   const { error: e0 } = await supabase.from('savings_plans').delete().eq('family_id', familyId)
@@ -167,6 +154,6 @@ export async function resetFamilyData(familyId) {
   if (loanError) throw loanError
   const { error: e1 } = await supabase.from('transactions').delete().eq('family_id', familyId)
   if (e1) throw e1
-  const { error: e2 } = await supabase.from('budgets').delete().eq('family_id', familyId)
-  if (e2) throw e2
+  const { error: cashAssetError } = await supabase.from('cash_assets').delete().eq('family_id', familyId)
+  if (cashAssetError) throw cashAssetError
 }
