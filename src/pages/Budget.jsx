@@ -10,6 +10,7 @@ import { useStockHoldings } from '../hooks/useStockHoldings'
 import { upsertBudget, saveCashSettings, addSavingsPlan, updateSavingsPlan, addLoan, updateLoan, saveStockHolding, deleteStockHolding } from '../lib/api'
 import { formatWon, monthStr, monthRange, monthLabel, addMonths, todayStr } from '../utils/format'
 import { recordedCashBalance } from '../utils/creditCards'
+import { savingsAmounts } from '../utils/savings'
 import BudgetProgressBar from '../components/BudgetProgressBar'
 import ColoringGrid from '../components/ColoringGrid'
 
@@ -292,15 +293,23 @@ export default function Budget() {
 
       <div className="card">
         <div className="section-title">적금</div>
-        <div className="hint-text" style={{ marginBottom: 12 }}>오늘 이후의 납입일에 계좌이체 지출이 자동 등록돼요. 31일 등 말일이 없는 달에는 그 달의 마지막 날에 납입해요.</div>
+        <div className="hint-text" style={{ marginBottom: 12 }}>오늘 이후의 납입일에 계좌이체 지출이 자동 등록돼요. 31일 등 말일이 없는 달에는 그 달의 마지막 날에 납입해요. 아래 금액은 이자 없이 납입 일정으로 계산하며 과거 미납이나 중지 기간은 반영하지 않아요.</div>
         {plansError && <div className="error-text">적금 목록을 불러오지 못했어요. 데이터베이스 마이그레이션을 확인해주세요.</div>}
         {plans.length === 0 && <div className="hint-text" style={{ marginBottom: 12 }}>등록한 적금이 없어요.</div>}
-        {plans.map((plan) => (
-          <div className="settings-list-item" key={plan.id}>
-            <span><strong>{plan.name}</strong> · 매달 {plan.debit_day}일 {formatWon(plan.monthly_amount)} · 만기 {plan.maturity_date}{!plan.active && ' · 중지'}</span>
+        {plans.map((plan) => {
+          const { total, paid, remaining } = savingsAmounts(plan, todayStr())
+          return <div className="settings-list-item savings-plan-item" key={plan.id}>
+            <div>
+              <div><strong>{plan.name}</strong> · 매달 {plan.debit_day}일 {formatWon(plan.monthly_amount)} · 만기 {plan.maturity_date}{!plan.active && ' · 중지'}</div>
+              <div className="savings-amounts">
+                <span>총 납입 금액 <strong>{formatWon(total)}</strong></span>
+                <span>현재까지 납입된 금액 <strong>{formatWon(paid)}</strong></span>
+                <span>남은 납입 금액 <strong>{formatWon(remaining)}</strong></span>
+              </div>
+            </div>
             <button type="button" className="btn btn-sm btn-ghost" onClick={() => handleTogglePlan(plan)}>{plan.active ? '중지' : '다시 시작'}</button>
           </div>
-        ))}
+        })}
         <form className="savings-form" onSubmit={handleAddPlan}>
           <div className="field"><label htmlFor="savings-name">적금 이름</label><input id="savings-name" value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="예: 여행 적금" maxLength={80} required /></div>
           <div className="field"><label htmlFor="savings-amount">매달 납입액</label><input id="savings-amount" type="number" min="1" value={planAmount} onChange={(e) => setPlanAmount(e.target.value)} required /></div>

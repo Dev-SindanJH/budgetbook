@@ -436,6 +436,10 @@ a {
 .stock-holding-item { gap: 12px; }
 .stock-holding-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
+.savings-plan-item { gap: 12px; }
+.savings-amounts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; color: var(--text-muted); font-size: 13px; }
+.savings-amounts strong { color: var(--text); }
+
 .credit-card-item { gap: 10px; }
 .credit-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
