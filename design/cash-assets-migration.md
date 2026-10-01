@@ -22,10 +22,11 @@
 3. 환경변수가 설정된 상태로 `npm ci && npm run build`를 실행하고 새 프런트엔드를 배포한다. DB와 프런트엔드는 함께 전환해야 한다. 새 DB는 보유처 없는 새 거래를 거부한다.
 4. 기존 잔액 보존, 새 지출·수입 등록, 수정·삭제, 적금 합계를 확인한다.
 
-현재 작업에서는 운영 DB 적용과 배포를 하지 않았다.
+2026-10-01 운영 DB에 적용했다. 기존 현금 항목 2개와 거래 111건, 적금 2개의 기존 필드가 바뀌지 않았음을 같은 트랜잭션 안에서 검증했다. 기존 거래는 모두 잔액 재반영에서 제외했다. 운영 설정으로 docs 배포 파일도 갱신했다.
 
 ## 검증
 
 - `node --test tests/asset-balances.test.mjs`
 - `PGLITE_MODULE_PATH`에 설치된 `@electric-sql/pglite` 경로를 지정한 뒤 `node tests/cash-migration.mjs`: 독립 PostgreSQL에서 기존 데이터 보존, 재실행, 외래키, RLS, 자동납입 상속을 검사한다.
 - `node tests/design-smoke.mjs`: `PLAYWRIGHT_MODULE_PATH`, `BROWSER_PATH`로 외부 Playwright와 브라우저를 지정할 수 있다. 실제 계정·API를 사용하지 않는다.
+
