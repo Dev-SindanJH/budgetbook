@@ -27,7 +27,7 @@ import {
   isImmediateExpense,
 } from '../utils/creditCards'
 import CategoryDonutChart from '../components/CategoryDonutChart'
-import DashboardCalendar from '../components/DashboardCalendar'
+import FamilyEvents from '../components/FamilyEvents'
 import ColoringGrid from '../components/ColoringGrid'
 import TransactionForm from '../components/TransactionForm'
 import Modal from '../components/Modal'
@@ -322,6 +322,7 @@ export default function Dashboard() {
             </button>
           )}
         </aside>
+        <FamilyEvents mode="home" transactions={allTransactions} transactionsLoading={loading} transactionsError={transactionsError} onTransactionsChanged={refresh} />
         <Link to="/budget" className="card asset-strip">
           <span className="section-icon">
             <Icon name="wallet" />
@@ -408,8 +409,8 @@ export default function Dashboard() {
               <Icon name="calendar" />
             </span>
             <span>
-              <strong>소비 달력</strong>
-              <small>날짜별로 확인하는 돈의 흐름</small>
+              <strong>가족 캘린더</strong>
+              <small>챙길 일정과 준비할 돈을 함께</small>
             </span>
             <Icon name="right" size={16} />
           </Link>
@@ -434,10 +435,7 @@ export default function Dashboard() {
           </summary>
           <div className="grid grid-2">
             {prefs.calendar && (
-              <section className="card">
-                <h2 className="section-title">소비 달력</h2>
-                <DashboardCalendar month={month} transactions={transactions} />
-              </section>
+              <FamilyEvents month={month} transactions={allTransactions} transactionsLoading={loading} transactionsError={transactionsError} calendarTransactions={transactions} onTransactionsChanged={refresh} />
             )}
             {prefs.categoryDonut && (
               <section className="card">

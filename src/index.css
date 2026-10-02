@@ -2102,3 +2102,61 @@ input[type='checkbox'] {
   text-align: center;
   color: var(--text-muted);
 }
+
+/* Shared family calendar: schedules stay visually separate from booked spending. */
+.family-events { min-width: 0; }
+.family-events-home { grid-column: 1 / -1; }
+.family-events .section-heading { gap: 12px; flex-wrap: wrap; }
+.family-events .section-heading a { color: var(--primary); font-size: 13px; }
+.event-summary { display: flex; gap: 8px 16px; align-items: baseline; flex-wrap: wrap; padding: 16px; margin: 16px 0; border-radius: 16px; background: #f1edff; }
+.event-summary strong { font-size: 21px; }
+.event-summary small { width: 100%; color: var(--text-muted); }
+.family-event-row { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--border); padding: 14px 0; }
+.family-event-row:hover { background: var(--primary-soft); }
+.event-date-tile { display: flex; flex-direction: column; flex-shrink: 0; align-items: center; justify-content: center; width: 46px; min-height: 52px; border-radius: 13px; background: var(--primary-soft); color: var(--primary-dark); }
+.event-date-tile strong { font-size: 20px; line-height: 1.1; }
+.event-date-tile small { font-size: 11px; }
+.event-row-info { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.event-row-info strong { overflow-wrap: anywhere; }
+.event-row-info small { color: var(--text-muted); margin-top: 4px; }
+.event-row-money { color: #675091; font-size: 13px; text-align: right; max-width: 40%; overflow-wrap: anywhere; }
+.status-cancelled .event-row-info { color: var(--text-muted); }
+.status-complete .event-row-money { color: var(--income); }
+.event-home-add { width: 100%; margin-top: 16px; }
+.event-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.event-toolbar .toggle-group { width: auto; flex: 1; max-width: 280px; }
+.calendar-event-title { display: block; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #675091; background: #f1edff; border-radius: 5px; font-size: 11px; padding: 2px 3px; }
+.calendar-event-detail { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; margin: 6px 0; width: 100%; border: 1px solid var(--border); background: #f8f6ff; border-radius: 12px; text-align: left; overflow-wrap: anywhere; }
+.calendar-event-detail > span { min-width: 0; }
+.calendar-event-detail > span:last-child { color: #675091; }
+.event-options { margin: 16px 0; }
+.event-options summary { color: var(--text-muted); padding: 10px 0; }
+.overdue-events summary { color: var(--warn); }
+.event-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.event-date-fields { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; }
+.family-event-modal { width: min(620px, calc(100vw - 32px)); }
+.family-event-modal .field { min-width: 0; }
+.family-event-modal textarea { resize: vertical; min-height: 80px; width: 100%; }
+.event-date-preview { border-radius: 12px; background: var(--primary-soft); color: var(--primary-dark); padding: 12px; }
+.event-budget-field { border-radius: 16px; background: #f8f6ff; padding: 16px; margin: 12px 0; }
+.event-budget-field .hint-text { margin-bottom: 0; }
+.event-money-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0 12px; padding: 16px; background: #f8f6ff; border-radius: 16px; }
+.event-money-grid > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.event-money-grid small { color: var(--text-muted); }
+.event-money-grid strong { overflow-wrap: anywhere; font-size: 16px; }
+.event-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
+.event-linked-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding: 12px 0; }
+.event-linked-row > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.event-linked-row strong { display: block; }
+.event-link-picker { margin-bottom: 24px; max-height: 330px; overflow-y: auto; }
+.event-memo { white-space: pre-wrap; overflow-wrap: anywhere; }
+.event-transaction-link { color: var(--primary); text-decoration: underline; }
+@media (max-width: 600px) {
+  .family-event-modal { width: 100%; }
+  .event-money-grid { gap: 8px; padding: 12px; }
+  .event-money-grid strong { font-size: 13px; }
+  .family-event-row { gap: 10px; }
+  .event-row-money { max-width: 34%; font-size: 12px; }
+  .event-form-grid { grid-template-columns: 1fr; }
+  .calendar-event-title { font-size: 10px; }
+}

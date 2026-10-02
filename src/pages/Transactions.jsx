@@ -1,7 +1,7 @@
 import Money from '../components/Money'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useUI } from '../context/UIContext'
-import DashboardCalendar from '../components/DashboardCalendar'
+import FamilyEvents from '../components/FamilyEvents'
 import Icon from '../components/Icon'
 import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
@@ -17,9 +17,6 @@ import {
 } from '../lib/api'
 import {
   todayStr,
-  monthStr,
-  monthLabel,
-  addMonths,
 } from '../utils/format'
 import TransactionForm from '../components/TransactionForm'
 
@@ -58,10 +55,9 @@ export default function Transactions() {
   const { confirm, notify } = useUI()
   const [searchParams, setSearchParams] = useSearchParams()
   const view = searchParams.get('view') === 'calendar' ? 'calendar' : 'list'
-  const [calendarMonth, setCalendarMonth] = useState(monthStr())
   const [period, setPeriod] = useState('month')
   const range = view === 'calendar' ? {} : periodRange(period)
-  const { transactions, loading, refresh } = useTransactions(family?.id, range)
+  const { transactions, loading, error: transactionsError, refresh } = useTransactions(family?.id, range)
   const { categories } = useCategories(family?.id)
   const { members } = useProfiles(family?.id)
   const { cards } = useCreditCards(family?.id)
@@ -285,6 +281,7 @@ export default function Transactions() {
                           <div className="tx-meta">
                             {t.profiles?.name} · {cashAssets.find((asset) => asset.id === t.cash_asset_id)?.name || '보유처 미지정'}
                             {t.cash_balance_included === false && ' · 기존 잔액에 포함'}
+                            {t.family_event_occurrence_id && <> · <Link className="event-transaction-link" to={`/transactions?view=calendar&event=${t.family_event_occurrence_id}`}>연결된 가족 일정</Link></>}
                           </div>
                         </div>
                       </div>
@@ -334,35 +331,8 @@ export default function Transactions() {
         </>
       )}
       {view === 'calendar' && (
-        <section className="card">
-          <div className="month-nav">
-            <button
-              className="icon-button"
-              aria-label="이전 달"
-              onClick={() => setCalendarMonth(addMonths(calendarMonth, -1))}
-            >
-              <Icon name="left" />
-            </button>
-            <span className="month-nav-label">{monthLabel(calendarMonth)}</span>
-            <button
-              className="icon-button"
-              aria-label="다음 달"
-              onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
-            >
-              <Icon name="right" />
-            </button>
-          </div>
-          {loading ? (
-            <div className="empty-state">불러오는 중…</div>
-          ) : (
-            <DashboardCalendar
-              month={calendarMonth}
-              transactions={filtered.filter((t) =>
-                t.date.startsWith(calendarMonth),
-              )}
-            />
-          )}
-        </section>
+        loading ? <div className="empty-state">불러오는 중…</div> :
+          <FamilyEvents transactions={transactions} transactionsError={transactionsError} calendarTransactions={filtered} onTransactionsChanged={refresh} />
       )}
 
       <button
@@ -381,6 +351,7 @@ export default function Transactions() {
           members={members}
           currentMemberId={profile?.id}
           initial={editing}
+          expenseOnly={Boolean(editing?.family_event_occurrence_id)}
           onSubmit={handleSubmit}
           onClose={() => {
             setShowForm(false)

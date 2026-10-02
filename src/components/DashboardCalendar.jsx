@@ -4,7 +4,7 @@ import { formatKoreanWon, formatWonWithReading, todayStr } from '../utils/format
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
-export default function DashboardCalendar({ month, transactions }) {
+export default function DashboardCalendar({ month, transactions, events = [], onEventClick, onAddEvent }) {
   const [selectedDate, setSelectedDate] = useState(null)
 
   const byDate = useMemo(() => {
@@ -51,11 +51,12 @@ export default function DashboardCalendar({ month, transactions }) {
               />
             )
           const data = byDate[dateStr]
+          const dayEvents = events.filter((event) => event.event_date === dateStr)
           const dayNum = Number(dateStr.slice(-2))
           return (
             <button
               key={dateStr}
-              aria-label={`${dateStr}${data ? `, 지출 ${formatWonWithReading(data.expense)}, 수입 ${formatWonWithReading(data.income)}` : ', 내역 없음'}`}
+              aria-label={`${dateStr}${data ? `, 지출 ${formatWonWithReading(data.expense)}, 수입 ${formatWonWithReading(data.income)}` : ', 거래 없음'}${dayEvents.length ? `, 일정 ${dayEvents.length}건: ${dayEvents.map((event) => event.title).join(', ')}` : ''}`}
               aria-pressed={dateStr === activeDate}
               type="button"
               className={
@@ -68,6 +69,7 @@ export default function DashboardCalendar({ month, transactions }) {
               }
             >
               <span className="calendar-day-num">{dayNum}</span>
+              {dayEvents.length > 0 && <span className="calendar-event-title">{dayEvents[0].title}{dayEvents.length > 1 ? ` +${dayEvents.length - 1}` : ''}</span>}
               {data?.expense > 0 && (
                 <span className="calendar-expense">
                   -{formatKoreanWon(data.expense)}
@@ -86,6 +88,8 @@ export default function DashboardCalendar({ month, transactions }) {
       {activeDate && (
         <div className="calendar-day-detail">
           <div className="section-title">{activeDate}</div>
+          {events.filter((event) => event.event_date === activeDate).map((event) => <button className="calendar-event-detail" type="button" key={event.id} onClick={() => onEventClick?.(event)}>{event.title}<span>{event.status === 'complete' ? '지출 마무리' : event.status === 'cancelled' ? '취소' : event.planned_amount == null ? '금액 미정' : `예정 ${formatKoreanWon(event.planned_amount)}`}</span></button>)}
+          {onAddEvent && <button type="button" className="btn btn-sm" onClick={() => onAddEvent(activeDate)}>이 날짜에 일정 추가</button>}
           {!dayData || dayData.items.length === 0 ? (
             <div className="empty-state">이 날의 내역이 없어요</div>
           ) : (

@@ -256,7 +256,7 @@ export default function Settings() {
   async function handleReset() {
     if (
       !(await confirm(
-        '모든 거래·현금·적금·대출·보유 주식 데이터가 삭제돼요. 이 작업은 되돌릴 수 없어요.',
+        '모든 거래·현금·적금·대출·보유 주식·가족 일정 데이터가 삭제돼요. 이 작업은 되돌릴 수 없어요.',
         { title: '데이터를 초기화할까요?', confirmLabel: '계속' },
       ))
     )
@@ -564,6 +564,7 @@ export default function Settings() {
 
         <div className="card settings-wide">
           <div className="section-title">데이터 관리</div>
+          <p className="hint-text">내보내기에는 가족 일정과 지출 연결 정보도 포함해요. 가져오기는 거래 내역만 지원해요.</p>
           <div
             style={{
               display: 'flex',
@@ -580,7 +581,7 @@ export default function Settings() {
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
             >
-              JSON 가져오기
+              거래 JSON 가져오기
             </button>
             <input
               ref={fileInputRef}

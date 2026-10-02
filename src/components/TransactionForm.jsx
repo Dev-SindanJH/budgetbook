@@ -14,14 +14,17 @@ export default function TransactionForm({
   cashAssets = [],
   currentMemberId,
   initial,
+  defaults,
+  expenseOnly = false,
   defaultType = 'expense',
   onSubmit,
   onClose,
 }) {
-  const [type, setType] = useState(initial?.type || defaultType)
-  const [date, setDate] = useState(initial?.date || todayStr())
+  const seed = initial || defaults
+  const [type, setType] = useState(seed?.type || defaultType)
+  const [date, setDate] = useState(seed?.date || todayStr())
   const [amount, setAmount] = useState(
-    initial?.amount ? String(initial.amount) : '',
+    seed?.amount ? String(seed.amount) : '',
   )
   const [categoryId, setCategoryId] = useState(initial?.category_id || '')
   const [paymentMethod, setPaymentMethod] = useState(
@@ -33,7 +36,7 @@ export default function TransactionForm({
   const [cardId, setCardId] = useState(initial?.card_id || '')
   const [cashAssetId, setCashAssetId] = useState(initial?.cash_asset_id || '')
   const affectsCash = !initial || initial.cash_balance_included === true
-  const [memo, setMemo] = useState(initial?.memo || '')
+  const [memo, setMemo] = useState(seed?.memo || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -112,7 +115,7 @@ export default function TransactionForm({
       className="transaction-modal"
     >
       <form onSubmit={handleSubmit}>
-        <div className="toggle-group" style={{ marginBottom: 14 }}>
+        {!expenseOnly && <div className="toggle-group" style={{ marginBottom: 14 }}>
           <button
             type="button"
             className={
@@ -133,7 +136,7 @@ export default function TransactionForm({
           >
             수입
           </button>
-        </div>
+        </div>}
 
         <div className="field amount-field">
           <label htmlFor="transaction-amount">금액 (원)</label>
@@ -154,6 +157,7 @@ export default function TransactionForm({
             <input
               id="transaction-date"
               type="date"
+              max={expenseOnly || initial?.family_event_occurrence_id ? todayStr() : undefined}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required

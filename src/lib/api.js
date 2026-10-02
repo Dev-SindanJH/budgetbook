@@ -5,6 +5,45 @@ export async function addTransaction(payload) {
   if (error) throw error
 }
 
+export async function saveFamilyEvent(id, definition, rows, fromYear, version = null) {
+  const { data, error } = await supabase.rpc('save_family_event', {
+    p_id: id, p_definition: definition, p_rows: rows, p_from_year: fromYear, p_version: version,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function updateFamilyOccurrence(event, patch) {
+  const { error } = await supabase.rpc('update_family_occurrence', {
+    p_id: event.id, p_patch: patch, p_version: event.family_events.version,
+  })
+  if (error) throw error
+}
+
+export async function stopFamilyEvent(event) {
+  const { error } = await supabase.rpc('stop_family_event', {
+    p_id: event.event_id, p_after_year: event.occurrence_year, p_version: event.family_events.version,
+  })
+  if (error) throw error
+}
+
+export async function recordFamilyEventExpense(event, transaction, requestId) {
+  const { data, error } = await supabase.rpc('record_family_event_expense', {
+    p_occurrence_id: event.id, p_transaction: transaction,
+    p_request_id: requestId, p_version: event.family_events.version,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function linkFamilyEventExpense(event, transactionId, unlink = false) {
+  const { error } = await supabase.rpc('link_family_event_expense', {
+    p_occurrence_id: event.id, p_transaction_id: transactionId,
+    p_unlink: unlink, p_version: event.family_events.version,
+  })
+  if (error) throw error
+}
+
 export async function updateTransaction(id, payload) {
   const { error } = await supabase.from('transactions').update(payload).eq('id', id)
   if (error) throw error
@@ -103,17 +142,21 @@ export async function updateOwnProfile(id, payload) {
 }
 
 export async function fetchAllFamilyData(familyId) {
-  const [{ data: categories }, { data: transactions }, { data: cashAssets }, { data: creditCards }, { data: cashSettings }, { data: savingsPlans }, { data: loans }, { data: stockHoldings }] = await Promise.all([
-    supabase.from('categories').select('*').eq('family_id', familyId),
-    supabase.from('transactions').select('*').eq('family_id', familyId),
-    supabase.from('cash_assets').select('*').eq('family_id', familyId),
-    supabase.from('credit_cards').select('*').eq('family_id', familyId),
-    supabase.from('cash_settings').select('*').eq('family_id', familyId),
-    supabase.from('savings_plans').select('*').eq('family_id', familyId),
-    supabase.from('loans').select('*').eq('family_id', familyId),
-    supabase.from('stock_holdings').select('*').eq('family_id', familyId),
-  ])
-  return { categories: categories || [], transactions: transactions || [], cashAssets: cashAssets || [], creditCards: creditCards || [], cashSettings: cashSettings?.[0] || null, savingsPlans: savingsPlans || [], loans: loans || [], stockHoldings: stockHoldings || [] }
+  const tables = { categories: 'categories', transactions: 'transactions', cashAssets: 'cash_assets', creditCards: 'credit_cards',
+    cashSettings: 'cash_settings', savingsPlans: 'savings_plans', loans: 'loans', stockHoldings: 'stock_holdings',
+    familyEvents: 'family_events', familyEventOccurrences: 'family_event_occurrences' }
+  const pairs = await Promise.all(Object.entries(tables).map(async ([key, table]) => {
+    const rows = []
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase.from(table).select('*').eq('family_id', familyId)
+        .order(table === 'cash_settings' ? 'family_id' : 'id').range(offset, offset + 999)
+      if (error) throw error
+      rows.push(...data)
+      if (data.length < 1000) break
+    }
+    return [key, key === 'cashSettings' ? rows[0] || null : rows]
+  }))
+  return Object.fromEntries(pairs)
 }
 
 export async function importTransactions(familyId, memberId, transactions) {
@@ -154,6 +197,8 @@ export async function resetFamilyData(familyId) {
   if (loanError) throw loanError
   const { error: e1 } = await supabase.from('transactions').delete().eq('family_id', familyId)
   if (e1) throw e1
+  const { error: eventError } = await supabase.from('family_events').delete().eq('family_id', familyId)
+  if (eventError) throw eventError
   const { error: cashAssetError } = await supabase.from('cash_assets').delete().eq('family_id', familyId)
   if (cashAssetError) throw cashAssetError
 }

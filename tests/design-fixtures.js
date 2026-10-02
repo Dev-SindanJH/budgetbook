@@ -109,6 +109,7 @@ export function fixture(name, args) {
     }
   }
   if (name === 'useCategories') return { ...base, categories }
+  if (name === 'useFamilyEvents') return { ...base, events: [] }
   if (name === 'useProfiles') return { ...base, members }
   if (name === 'useCreditCards') return { ...base, cards: empty ? [] : cards }
   if (name === 'useBudgets')
