@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cashAssetBalances } from '../src/utils/cashAssets.js'
+import { cashAssetBalances, cashAssetHistory } from '../src/utils/cashAssets.js'
 import { savingsAmounts, totalSavingsPaid } from '../src/utils/savings.js'
 
 const today = '2026-10-01'
@@ -23,6 +23,22 @@ test('카드는 결제일에만 차감하고 미래 현금 지출은 제외', ()
   assert.deepEqual(balances([{ ...expense, date: '2026-10-02' }]), [1000000, 200000])
   assert.deepEqual(balances([{ ...expense, payment_method: '신용카드', card_due_date: '2026-10-02' }]), [1000000, 200000])
   assert.deepEqual(balances([{ ...expense, payment_method: '신용카드', card_due_date: today }]), [400000, 200000])
+})
+test('보유처 내역은 기준 금액에서 현재 잔액까지 거래별 누적 잔액을 보여줌', () => {
+  const rows = [
+    { ...expense, id: 'e1', date: '2026-09-29', amount: 100000 },
+    { ...expense, id: 'i1', type: 'income', date: '2026-09-30', amount: 50000 },
+    { ...expense, id: 'card', payment_method: '신용카드', date: '2026-09-20', card_due_date: today, amount: 30000 },
+    { ...expense, id: 'future', date: '2026-10-05' },
+    { ...expense, id: 'old', cash_balance_included: false },
+    { ...expense, id: 'other', cash_asset_id: 'b' },
+  ]
+  const history = cashAssetHistory(assets[0], rows, today)
+  assert.deepEqual(history.entries.map((e) => [e.transaction.id, e.change, e.balance]),
+    [['card', -30000, 920000], ['i1', 50000, 950000], ['e1', -100000, 900000]])
+  assert.deepEqual(history.pending.map((e) => e.transaction.id), ['future'])
+  assert.deepEqual([history.base, history.change, history.balance, history.excludedCount], [1000000, -80000, 920000, 1])
+  assert.equal(history.balance, cashAssetBalances(assets, rows, today)[0].balance)
 })
 test('총 적금은 상세의 현재까지 납입액 합계와 일치하며 과거 납입 포함', () => {
   const plans = [

@@ -24,11 +24,47 @@ import {
   deleteStockHolding,
 } from '../lib/api'
 import {
+  formatWon,
   formatWonWithReading,
   monthStr,
   todayStr,
 } from '../utils/format'
-import { cashAssetBalances } from '../utils/cashAssets'
+import { cashAssetBalances, cashAssetHistory } from '../utils/cashAssets'
+import { isCreditCardExpense } from '../utils/creditCards'
+
+const signedWon = (amount) => (amount > 0 ? '+' : '') + formatWon(amount)
+
+function CashHistoryRow({ entry, pending = false }) {
+  const { transaction, date, change, balance } = entry
+  const card = isCreditCardExpense(transaction)
+  return (
+    <div className={'cash-history-row' + (pending ? ' pending' : '')}>
+      <span>
+        <strong>
+          {transaction.memo ||
+            transaction.categories?.name ||
+            (transaction.type === 'income' ? '수입' : '지출')}
+        </strong>
+        <span className="hint-text">
+          {date}
+          {transaction.categories?.name && transaction.memo
+            ? ` · ${transaction.categories.name}`
+            : ''}
+          {card ? ` · 카드 결제 (${transaction.date} 사용)` : ''}
+          {transaction.profiles?.name ? ` · ${transaction.profiles.name}` : ''}
+        </span>
+      </span>
+      <span className="cash-history-amount">
+        <strong className={change > 0 ? 'income-text' : undefined}>
+          {signedWon(change)}
+        </strong>
+        {!pending && (
+          <span className="hint-text">잔액 {formatWon(balance)}</span>
+        )}
+      </span>
+    </div>
+  )
+}
 import { savingsAmounts, totalSavingsPaid } from '../utils/savings'
 
 export default function Budget() {
@@ -84,6 +120,7 @@ export default function Budget() {
   const [editingCashAssetId, setEditingCashAssetId] = useState(null)
   const [cashAssetMessage, setCashAssetMessage] = useState('')
   const [savingCashAsset, setSavingCashAsset] = useState(false)
+  const [historyAssetId, setHistoryAssetId] = useState(null)
   const [planName, setPlanName] = useState('')
   const [planAmount, setPlanAmount] = useState('')
   const [planDay, setPlanDay] = useState('1')
@@ -112,6 +149,8 @@ export default function Budget() {
 
   const cashAssets = cashAssetBalances(storedCashAssets, allTransactions, todayStr())
   const cashAssetTotal = cashAssets.reduce((sum, asset) => sum + asset.balance, 0)
+  const historyAsset = cashAssets.find((asset) => asset.id === historyAssetId)
+  const history = historyAsset && cashAssetHistory(historyAsset, allTransactions, todayStr())
 
   async function handleSaveCashAsset(e) {
     e.preventDefault()
@@ -546,6 +585,13 @@ export default function Budget() {
                 <button
                   type="button"
                   className="btn btn-sm"
+                  onClick={() => setHistoryAssetId(asset.id)}
+                >
+                  내역
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
                   onClick={() => {
                     setAssetForm('cash')
                     setEditingCashAssetId(asset.id)
@@ -580,6 +626,75 @@ export default function Budget() {
             <Icon name="plus" size={18} />
             현금 항목 추가
           </button>
+          {history && (
+            <Modal
+              title={`${historyAsset.name} 잔액 내역`}
+              description="기준 금액에 이 보유처로 등록한 거래를 날짜순으로 더하고 뺀 결과예요."
+              onClose={() => setHistoryAssetId(null)}
+              className="transaction-modal"
+            >
+              <div className="cash-history-summary">
+                <div>
+                  <small>기준 금액</small>
+                  <strong>{formatWon(history.base)}</strong>
+                </div>
+                <div>
+                  <small>거래 반영 {history.entries.length}건</small>
+                  <strong>{signedWon(history.change)}</strong>
+                </div>
+                <div>
+                  <small>현재 잔액</small>
+                  <strong>{formatWon(history.balance)}</strong>
+                </div>
+              </div>
+              <div className="hint-text">
+                기준 금액은 직접 입력하거나 수정한 잔액에서 정해져요. 잔액을
+                수정하면 그 차이만큼 기준 금액이 바뀌고, 수정 기록은 따로 남지
+                않아요.
+              </div>
+              <div className="cash-history-title">잔액에 반영된 거래</div>
+              {history.entries.length === 0 && (
+                <div className="hint-text">아직 반영된 거래가 없어요.</div>
+              )}
+              {history.entries.map((entry) => (
+                <CashHistoryRow key={entry.transaction.id} entry={entry} />
+              ))}
+              {history.entries.length > 0 && (
+                <div className="cash-history-row">
+                  <span>
+                    <strong>기준 금액</strong>
+                    <span className="hint-text">거래를 반영하기 전 잔액</span>
+                  </span>
+                  <span className="cash-history-amount">
+                    <strong>{formatWon(history.base)}</strong>
+                  </span>
+                </div>
+              )}
+              {history.pending.length > 0 && (
+                <>
+                  <div className="cash-history-title">
+                    반영 예정 {history.pending.length}건
+                  </div>
+                  <div className="hint-text">
+                    거래일이나 카드 결제일이 되면 잔액에 반영돼요.
+                  </div>
+                  {history.pending.map((entry) => (
+                    <CashHistoryRow
+                      key={entry.transaction.id}
+                      entry={entry}
+                      pending
+                    />
+                  ))}
+                </>
+              )}
+              {history.excludedCount > 0 && (
+                <div className="hint-text" style={{ marginTop: 16 }}>
+                  이 보유처에 연결된 이전 거래 {history.excludedCount}건은 기준
+                  금액에 이미 포함되어 있어 다시 반영하지 않아요.
+                </div>
+              )}
+            </Modal>
+          )}
           {assetForm === 'cash' && (
             <Modal
               title="현금 항목 등록·수정"

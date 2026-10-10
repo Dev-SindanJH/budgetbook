@@ -2160,3 +2160,18 @@ input[type='checkbox'] {
   .event-form-grid { grid-template-columns: 1fr; }
   .calendar-event-title { font-size: 10px; }
 }
+.cash-history-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0 8px; padding: 16px; background: var(--primary-soft); border-radius: 16px; }
+.cash-history-summary > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cash-history-summary small { color: var(--text-muted); }
+.cash-history-summary strong { overflow-wrap: anywhere; font-size: 16px; }
+.cash-history-title { margin: 20px 0 4px; font-size: 14px; font-weight: 700; }
+.cash-history-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding: 12px 0; }
+.cash-history-row:last-child { border: 0; }
+.cash-history-row > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cash-history-row strong { display: block; }
+.cash-history-amount { text-align: right; flex-shrink: 0; }
+.cash-history-row.pending { opacity: 0.7; }
+@media (max-width: 600px) {
+  .cash-history-summary { gap: 8px; padding: 12px; }
+  .cash-history-summary strong { font-size: 13px; }
+}
