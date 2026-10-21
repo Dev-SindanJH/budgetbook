@@ -32,6 +32,13 @@ const schema = fs
     '',
   )
 await db.exec(schema)
+// Production retains older RLS policies alongside the schema's current policies.
+// This helper must work when invoked from a calendar RPC's empty search_path.
+await db.exec(`create or replace function public.my_family_id() returns uuid
+  language sql stable security definer as $$select family_id from profiles where id=auth.uid()$$;
+  create policy legacy_profiles_family on public.profiles for select using(family_id=public.my_family_id());
+  create policy legacy_transactions_family on public.transactions for all
+    using(family_id=public.my_family_id()) with check(family_id=public.my_family_id());`)
 await db.exec(
   fs.readFileSync(
     'supabase/migrations/20261002032103_family_calendar.sql',
@@ -64,6 +71,17 @@ const rows = buildOccurrences(definition, year, {
   event_date: today,
   spend_date: today,
 })
+// The old helper reproduces the user's exact error before the repair.
+await assert.rejects(
+  sql('select public.save_family_event($1,$2,$3,$4)', [eventId, definition, JSON.stringify(rows), year]),
+  /relation "profiles" does not exist/,
+)
+await db.exec('reset role')
+const lookupRepair = fs.readFileSync('supabase/migrations/20261002072720_fix_family_lookup_search_path.sql', 'utf8')
+await db.exec(lookupRepair)
+await db.exec(lookupRepair) // Safe for both legacy and repaired databases.
+await db.exec('set role authenticated')
+assert.equal((await sql('select public.my_family_id() as id')).rows[0].id, family)
 await sql('select public.save_family_event($1,$2,$3,$4)', [
   eventId,
   definition,

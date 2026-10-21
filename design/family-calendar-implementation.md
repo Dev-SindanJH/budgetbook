@@ -45,3 +45,12 @@
 Supabase 보안 진단에서 이번 기능의 신규 경고는 없었다. 변경 전부터 있던 [함수 search_path](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable), [기존 SECURITY DEFINER 함수 권한](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable), [유출 비밀번호 보호 설정](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection) 경고는 동일하게 남아 있다.
 
 화면 검증 이미지는 `.test-results/family-calendar/`에 저장한다. 테스트 픽스처는 앱 빌드에 포함하지 않는다.
+
+## 운영 저장 오류 수정 (2026-10-02)
+
+- 증상: 일정 저장 시 `relation "profiles" does not exist`가 표시됨.
+- 원인: 운영 DB의 이전 RLS 정책이 `my_family_id()`를 계속 사용하고 있었다. 이 함수의 `profiles` 참조에는 스키마가 없어, 빈 `search_path`를 쓰는 캘린더 RPC 안에서 실패했다. 초기 로컬 테스트는 최신 스키마만 사용해 이전 함수와 정책을 재현하지 못했다.
+- 수정: 이전 함수는 `public.profiles`를 명시하고 실행 경로를 고정했다. 현재 가족 조회 함수도 실행 경로를 고정했다. 함수 서명·기존 권한·가족 격리 정책은 유지했다.
+- `20261002072720_fix_family_lookup_search_path.sql`을 운영 DB에 적용했다. 프런트엔드 업데이트 없이 다시 저장할 수 있다.
+- 회귀 검사에 운영의 이전 함수와 정책을 추가했다. 수정 전 동일 오류 발생, 수정 후 일정 저장·지출 연결·가족별 RLS 검사 통과를 확인했다.
+- 운영 DB에서도 로그인 역할로 2027-02-28부터 2100년까지 금액 미정 생신 74건의 저장을 검증했다. 전체 테스트 트랜잭션을 롤백한 뒤 테스트 행이 0건임을 확인했다.
