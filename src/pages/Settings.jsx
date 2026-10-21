@@ -399,6 +399,7 @@ export default function Settings() {
           <div className="hint-text" style={{ marginBottom: 12 }}>
             카드 번호는 저장하지 않아요. 별명과 매달 자동이체일만 등록하세요.
             사용한 금액은 다음 달 해당 날짜에 빠지는 것으로 계산해요.
+            등록한 카드는 같은 가계부의 가족 모두가 지출 기록에 사용할 수 있어요.
           </div>
           {cardsError && (
             <div className="error-text">

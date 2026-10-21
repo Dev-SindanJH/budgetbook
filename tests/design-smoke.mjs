@@ -179,6 +179,35 @@ try {
   assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].cash_asset_id), 'cash-1')
   assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].amount), 18000)
   assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].cash_balance_included), true)
+  // Cards are shared: member-1 can pay with the card member-2 registered, and pay in installments.
+  await page.getByRole('button', { name: '지출 기록', exact: true }).click()
+  await page.getByLabel('결제수단', { exact: true }).selectOption('신용카드')
+  await page.getByLabel('사용한 신용카드').selectOption({ label: '서준 카드 · 서준' })
+  await page.getByRole('button', { name: '할부', exact: true }).click()
+  await page.getByLabel('할부 전체 금액 (원)').fill('1000000')
+  await page.getByLabel('할부 개월 수').fill('10')
+  assert.equal(await page.getByLabel('남은 회차').inputValue(), '10')
+  await page.getByLabel('남은 회차').fill('3')
+  await page.getByLabel('구매일 (1회차 사용일)').fill('2026-03-05')
+  await page.getByText('8~10회차 3건을 자동으로 등록해요').waitFor()
+  await page.getByText('8회차 · 2026-10-05 사용분 · 2026-11-25 출금 · 100,000원').waitFor()
+  await page.getByLabel('카드 결제대금 출금 보유처').selectOption('cash-1')
+  await page.getByLabel('할부 항목명').fill('냉장고')
+  await noOverflow('installment modal')
+  await shot('desktop-installment-modal')
+  await page.getByRole('button', { name: '매달 금액', exact: true }).click()
+  await page.getByLabel('매달 내는 금액 (원)').fill('52000')
+  await page.getByText('남은 금액 합계 156,000원').waitFor()
+  await page.getByRole('button', { name: '할부 등록', exact: true }).click()
+  await page.locator('dialog').waitFor({ state: 'detached' })
+  assert.deepEqual(await page.evaluate(() => window.__calls.at(-1)), {
+    name: 'addCardInstallment',
+    args: [{
+      member_id: 'member-1', card_id: 'card-2', category_id: 'food', cash_asset_id: 'cash-1', name: '냉장고',
+      purchase_date: '2026-03-05', total_months: 10, first_installment: 8, amount_mode: 'monthly', amount: 52000,
+      family_id: 'family-1',
+    }],
+  })
   await page.getByRole('button', { name: '수입 기록', exact: true }).click()
   await page.getByLabel('금액 (원)').fill('100000')
   await page.getByRole('button', { name: '기록하기', exact: true }).click()
@@ -196,6 +225,17 @@ try {
   await shot('card-schedule')
   await close()
   await go('/transactions')
+  await page.getByRole('button', { name: '카드별', exact: true }).click()
+  await page.locator('.tx-card-header').getByText('우리 집 생활비 · 지민 · 1건').waitFor()
+  await page.getByText('진행 중인 할부').waitFor()
+  await page.locator('.installment-item').getByText('냉장고').waitFor()
+  assert.equal(await page.locator('.transaction-result-count').innerText(), '신용카드 내역 1건')
+  await noOverflow('card grouping')
+  await shot('desktop-card-grouping')
+  await page.getByLabel('신용카드', { exact: true }).selectOption('card-2')
+  await page.getByText('조건에 맞는 거래가 없어요').waitFor()
+  await page.getByLabel('신용카드', { exact: true }).selectOption('all')
+  await page.getByRole('button', { name: '날짜별', exact: true }).click()
   await page.getByRole('button', { name: '수정', exact: true }).first().click()
   await page.getByText('기존 잔액에 포함된 내역이에요.', { exact: false }).waitFor()
   await page.getByRole('button', { name: '수정 완료' }).click()

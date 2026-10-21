@@ -12,7 +12,7 @@ import { totalSavingsPaid } from '../utils/savings'
 import { useSavingsPlans } from '../hooks/useSavingsPlans'
 import { useCashAssets } from '../hooks/useCashAssets'
 import { useStockHoldings } from '../hooks/useStockHoldings'
-import { addTransaction } from '../lib/api'
+import { addCardInstallment, addTransaction } from '../lib/api'
 import {
   formatWonWithReading,
   monthStr,
@@ -173,6 +173,11 @@ export default function Dashboard() {
     setMonth(payload.date.slice(0, 7))
     if (member !== 'all') setMember(payload.member_id)
     notify('내역을 기록했어요')
+  }
+  async function handleAddInstallment(payload) {
+    await addCardInstallment({ ...payload, family_id: family.id })
+    await refresh()
+    notify('할부를 등록했어요')
   }
   return (
     <div className="dashboard">
@@ -533,6 +538,7 @@ export default function Dashboard() {
           currentMemberId={profile?.id}
           defaultType={formType}
           onSubmit={handleAdd}
+          onSubmitInstallment={handleAddInstallment}
           onClose={() => setFormType(null)}
         />
       )}

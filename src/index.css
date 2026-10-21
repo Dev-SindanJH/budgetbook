@@ -508,7 +508,8 @@ input[type='checkbox'] {
   margin-bottom: 20px;
   min-width: 0;
 }
-.field label {
+.field label,
+.field .field-label {
   font-size: 13px;
   font-weight: 600;
   color: #53627b;
@@ -914,6 +915,20 @@ input[type='checkbox'] {
   font-size: 12px;
   padding: 12px 0 4px;
 }
+.tx-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+.installment-summary {
+  margin-bottom: 8px;
+}
+.installment-item .tx-meta {
+  display: block;
+  margin-top: 2px;
+}
 .tx-date-group .tx-row:last-child {
   border: 0;
 }
@@ -934,7 +949,7 @@ input[type='checkbox'] {
 }
 .transaction-filter-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.5fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1.5fr;
   gap: 10px;
 }
 .transaction-filter-fields > * {
@@ -1553,6 +1568,13 @@ input[type='checkbox'] {
   font-size: 12px;
   line-height: 1.8;
   margin: 14px 0;
+}
+.field .toggle-group {
+  margin-bottom: 0;
+}
+.installment-preview ul {
+  margin: 4px 0;
+  padding-left: 18px;
 }
 .due-group {
   padding: 10px 0 20px;

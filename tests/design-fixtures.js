@@ -21,6 +21,25 @@ export const cards = [
     debit_day: 15,
     active: true,
   },
+  {
+    id: 'card-2',
+    owner_id: 'member-2',
+    nickname: '서준 카드',
+    debit_day: 25,
+    active: true,
+  },
+]
+export const installments = [
+  {
+    id: 'inst-1',
+    card_id: 'card-2',
+    name: '냉장고',
+    purchase_date: `${month}-01`,
+    total_months: 10,
+    first_installment: 1,
+    amount_mode: 'total',
+    amount: 1000000,
+  },
 ]
 export const rows = [
   {
@@ -112,6 +131,8 @@ export function fixture(name, args) {
   if (name === 'useFamilyEvents') return { ...base, events: [] }
   if (name === 'useProfiles') return { ...base, members }
   if (name === 'useCreditCards') return { ...base, cards: empty ? [] : cards }
+  if (name === 'useCardInstallments')
+    return { ...base, installments: empty ? [] : installments }
   if (name === 'useBudgets')
     return {
       ...base,

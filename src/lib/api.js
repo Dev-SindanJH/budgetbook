@@ -64,6 +64,16 @@ export async function updateCreditCard(id, payload) {
   if (error) throw error
 }
 
+export async function addCardInstallment(payload) {
+  const { error } = await supabase.from('card_installments').insert(payload)
+  if (error) throw error
+}
+
+export async function deleteCardInstallment(id) {
+  const { error } = await supabase.from('card_installments').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function saveCashAsset({ id, family_id, name, amount }) {
   const query = id
     ? supabase.from('cash_assets').update({ name, amount }).eq('id', id)
@@ -142,7 +152,7 @@ export async function updateOwnProfile(id, payload) {
 }
 
 export async function fetchAllFamilyData(familyId) {
-  const tables = { categories: 'categories', transactions: 'transactions', cashAssets: 'cash_assets', creditCards: 'credit_cards',
+  const tables = { categories: 'categories', transactions: 'transactions', cashAssets: 'cash_assets', creditCards: 'credit_cards', cardInstallments: 'card_installments',
     cashSettings: 'cash_settings', savingsPlans: 'savings_plans', loans: 'loans', stockHoldings: 'stock_holdings',
     familyEvents: 'family_events', familyEventOccurrences: 'family_event_occurrences' }
   const pairs = await Promise.all(Object.entries(tables).map(async ([key, table]) => {
@@ -195,6 +205,8 @@ export async function resetFamilyData(familyId) {
   if (e0) throw e0
   const { error: loanError } = await supabase.from('loans').delete().eq('family_id', familyId)
   if (loanError) throw loanError
+  const { error: installmentError } = await supabase.from('card_installments').delete().eq('family_id', familyId)
+  if (installmentError) throw installmentError
   const { error: e1 } = await supabase.from('transactions').delete().eq('family_id', familyId)
   if (e1) throw e1
   const { error: eventError } = await supabase.from('family_events').delete().eq('family_id', familyId)

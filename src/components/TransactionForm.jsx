@@ -1,7 +1,8 @@
 import MoneyInput from './MoneyInput'
 import { useEffect, useState } from 'react'
 import { todayStr, monthLabel } from '../utils/format'
-import { creditCardDueDate } from '../utils/creditCards'
+import { creditCardDueDate, installmentSchedule } from '../utils/creditCards'
+import { formatWon } from '../utils/format'
 import { Link } from 'react-router-dom'
 import Modal from './Modal'
 
@@ -18,6 +19,7 @@ export default function TransactionForm({
   expenseOnly = false,
   defaultType = 'expense',
   onSubmit,
+  onSubmitInstallment,
   onClose,
 }) {
   const seed = initial || defaults
@@ -37,14 +39,40 @@ export default function TransactionForm({
   const [cashAssetId, setCashAssetId] = useState(initial?.cash_asset_id || '')
   const affectsCash = !initial || initial.cash_balance_included === true
   const [memo, setMemo] = useState(seed?.memo || '')
+  const [installment, setInstallment] = useState(false)
+  const [totalMonths, setTotalMonths] = useState('3')
+  const [remainingMonths, setRemainingMonths] = useState('3')
+  const [amountMode, setAmountMode] = useState('total')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const filteredCategories = categories.filter((c) => c.type === type)
+  // Any card in the household can be used, whoever registered it.
   const availableCards = cards.filter(
-    (c) => c.owner_id === memberId && (c.active || c.id === initial?.card_id),
+    (c) => c.active || c.id === initial?.card_id,
   )
+  const ownerName = (card) =>
+    members.find((m) => m.id === card.owner_id)?.name || '가족'
   const selectedCard = availableCards.find((c) => c.id === cardId)
+  const isCardExpense = type === 'expense' && paymentMethod === '신용카드'
+  const canInstall = Boolean(onSubmitInstallment) && !initial && isCardExpense
+  const isInstallment = canInstall && installment
+  const months = Number(totalMonths)
+  const remaining = Number(remainingMonths)
+  const validInstallment =
+    Number.isInteger(months) && months >= 2 && months <= 60 &&
+    Number.isInteger(remaining) && remaining >= 1 && remaining <= months
+  const schedule =
+    isInstallment && validInstallment && selectedCard && date && Number(amount) > 0
+      ? installmentSchedule({
+          purchaseDate: date,
+          totalMonths: months,
+          firstInstallment: months - remaining + 1,
+          amountMode,
+          amount,
+          debitDay: selectedCard.debit_day,
+        })
+      : []
   const previewDueDate =
     selectedCard && date
       ? initial?.card_due_date &&
@@ -73,7 +101,7 @@ export default function TransactionForm({
       setError('작성자를 선택해주세요')
       return
     }
-    if (type === 'expense' && paymentMethod === '신용카드' && !selectedCard) {
+    if (isCardExpense && !selectedCard) {
       setError('등록된 신용카드를 선택해주세요')
       return
     }
@@ -81,8 +109,39 @@ export default function TransactionForm({
       setError('잔액을 반영할 현금 보유처를 선택해주세요')
       return
     }
+    if (isInstallment) {
+      if (!validInstallment) {
+        setError('할부 개월 수는 2~60개월, 남은 회차는 1회차부터 할부 개월 수까지 입력해주세요')
+        return
+      }
+      if (!Number.isInteger(numAmount)) {
+        setError('할부 금액은 원 단위 정수로 입력해주세요')
+        return
+      }
+      if (amountMode === 'total' && numAmount < months) {
+        setError('전체 금액은 할부 개월 수보다 커야 해요')
+        return
+      }
+    }
     setBusy(true)
     try {
+      if (isInstallment) {
+        const category = categories.find((c) => c.id === categoryId)
+        await onSubmitInstallment({
+          member_id: memberId,
+          card_id: cardId,
+          category_id: categoryId || null,
+          cash_asset_id: cashAssetId || null,
+          name: memo.trim() || `${category?.name || '카드'} 할부`,
+          purchase_date: date,
+          total_months: months,
+          first_installment: months - remaining + 1,
+          amount_mode: amountMode,
+          amount: numAmount,
+        })
+        onClose()
+        return
+      }
       await onSubmit({
         type,
         date,
@@ -139,7 +198,11 @@ export default function TransactionForm({
         </div>}
 
         <div className="field amount-field">
-          <label htmlFor="transaction-amount">금액 (원)</label>
+          <label htmlFor="transaction-amount">
+            {isInstallment
+              ? amountMode === 'total' ? '할부 전체 금액 (원)' : '매달 내는 금액 (원)'
+              : '금액 (원)'}
+          </label>
           <MoneyInput
             id="transaction-amount"
             className="amount-input"
@@ -153,7 +216,7 @@ export default function TransactionForm({
         </div>
         <div className="transaction-form-grid">
           <div className="field">
-            <label htmlFor="transaction-date">날짜</label>
+            <label htmlFor="transaction-date">{isInstallment ? '구매일 (1회차 사용일)' : '날짜'}</label>
             <input
               id="transaction-date"
               type="date"
@@ -209,7 +272,7 @@ export default function TransactionForm({
                 <option value="">카드를 선택하세요</option>
                 {availableCards.map((card) => (
                   <option key={card.id} value={card.id}>
-                    {card.nickname}
+                    {card.nickname} · {ownerName(card)}
                     {card.active ? '' : ' (사용 중지)'}
                   </option>
                 ))}
@@ -223,6 +286,48 @@ export default function TransactionForm({
                 </span>
               )}
             </div>
+          )}
+
+          {canInstall && (
+            <div className="field">
+              <span className="field-label" id="transaction-installment-label">결제 방식</span>
+              <div className="toggle-group" role="group" aria-labelledby="transaction-installment-label">
+                <button type="button" className={'toggle-option' + (!installment ? ' active' : '')}
+                  aria-pressed={!installment} onClick={() => setInstallment(false)}>일시불</button>
+                <button type="button" className={'toggle-option' + (installment ? ' active' : '')}
+                  aria-pressed={installment} onClick={() => setInstallment(true)}>할부</button>
+              </div>
+            </div>
+          )}
+
+          {isInstallment && (
+            <>
+              <div className="field">
+                <label htmlFor="transaction-installment-months">할부 개월 수</label>
+                <input id="transaction-installment-months" type="number" min="2" max="60" inputMode="numeric"
+                  value={totalMonths} required
+                  onChange={(e) => {
+                    // Keep "remaining" in step while the user hasn't said some are already paid.
+                    if (remainingMonths === totalMonths) setRemainingMonths(e.target.value)
+                    setTotalMonths(e.target.value)
+                  }} />
+              </div>
+              <div className="field">
+                <label htmlFor="transaction-installment-remaining">남은 회차</label>
+                <input id="transaction-installment-remaining" type="number" min="1" max={months || 60} inputMode="numeric"
+                  value={remainingMonths} required onChange={(e) => setRemainingMonths(e.target.value)} />
+                <span className="hint-text">이미 낸 회차가 있으면 남은 회차만 입력하세요.</span>
+              </div>
+              <div className="field">
+                <span className="field-label" id="transaction-installment-mode-label">금액 입력 방식</span>
+                <div className="toggle-group" role="group" aria-labelledby="transaction-installment-mode-label">
+                  <button type="button" className={'toggle-option' + (amountMode === 'total' ? ' active' : '')}
+                    aria-pressed={amountMode === 'total'} onClick={() => setAmountMode('total')}>전체 금액</button>
+                  <button type="button" className={'toggle-option' + (amountMode === 'monthly' ? ' active' : '')}
+                    aria-pressed={amountMode === 'monthly'} onClick={() => setAmountMode('monthly')}>매달 금액</button>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="field">
@@ -243,10 +348,7 @@ export default function TransactionForm({
             <select
               id="transaction-member"
               value={memberId}
-              onChange={(e) => {
-                setMemberId(e.target.value)
-                setCardId('')
-              }}
+              onChange={(e) => setMemberId(e.target.value)}
             >
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -257,17 +359,44 @@ export default function TransactionForm({
           </div>
 
           <div className="field">
-            <label htmlFor="transaction-memo">메모</label>
+            <label htmlFor="transaction-memo">{isInstallment ? '할부 항목명' : '메모'}</label>
             <input
               id="transaction-memo"
               value={memo}
+              maxLength={isInstallment ? 80 : undefined}
               onChange={(e) => setMemo(e.target.value)}
-              placeholder="선택 사항"
+              placeholder={isInstallment ? '예: 냉장고 (비우면 카테고리 이름)' : '선택 사항'}
             />
           </div>
         </div>
 
-        {type === 'expense' && affectsCash && (
+        {isInstallment ? (
+          <div className="payment-explainer installment-preview">
+            {schedule.length ? (
+              <>
+                <strong>
+                  {schedule[0].no === schedule.at(-1).no
+                    ? `${schedule[0].no}회차`
+                    : `${schedule[0].no}~${schedule.at(-1).no}회차`}{' '}
+                  {schedule.length}건을 자동으로 등록해요
+                </strong>
+                <ul>
+                  {schedule.slice(0, 3).map((row) => (
+                    <li key={row.no}>
+                      {row.no}회차 · {row.date} 사용분 · {row.dueDate} 출금 · {formatWon(row.amount)}
+                    </li>
+                  ))}
+                  {schedule.length > 3 && (
+                    <li>… 마지막 {schedule.at(-1).no}회차 {schedule.at(-1).dueDate} 출금</li>
+                  )}
+                </ul>
+                남은 금액 합계 {formatWon(schedule.reduce((sum, row) => sum + row.amount, 0))}
+              </>
+            ) : (
+              '카드, 금액, 할부 개월 수를 입력하면 등록될 회차를 미리 보여드려요.'
+            )}
+          </div>
+        ) : type === 'expense' && affectsCash && (
           <div className="payment-explainer">
             {paymentMethod === '신용카드'
               ? previewDueDate
@@ -293,7 +422,7 @@ export default function TransactionForm({
             취소
           </button>
           <button className="btn btn-primary" disabled={busy} type="submit">
-            {busy ? '저장 중...' : initial ? '수정 완료' : '기록하기'}
+            {busy ? '저장 중...' : initial ? '수정 완료' : isInstallment ? '할부 등록' : '기록하기'}
           </button>
         </div>
       </form>
