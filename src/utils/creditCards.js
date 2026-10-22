@@ -24,6 +24,11 @@ function addMonthsToDate(date, months) {
   return `${month}-${String(day).padStart(2, '0')}`
 }
 
+// Purchase date (installment 1) for a plan entered from the date of a later installment.
+export function installmentPurchaseDate(installmentDate, installmentNo) {
+  return addMonthsToDate(installmentDate, 1 - Number(installmentNo))
+}
+
 // Mirrors sync_card_installment_transactions(): installment k is used k-1 months after
 // the purchase and, in "total" mode, the remainder of the division is billed first.
 export function installmentSchedule({ purchaseDate, totalMonths, firstInstallment = 1, amountMode, amount, debitDay }) {

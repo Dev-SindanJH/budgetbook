@@ -1,7 +1,7 @@
 import MoneyInput from './MoneyInput'
 import { useEffect, useState } from 'react'
 import { todayStr, monthLabel } from '../utils/format'
-import { creditCardDueDate, installmentSchedule } from '../utils/creditCards'
+import { creditCardDueDate, installmentPurchaseDate, installmentSchedule } from '../utils/creditCards'
 import { formatWon } from '../utils/format'
 import { Link } from 'react-router-dom'
 import Modal from './Modal'
@@ -62,12 +62,16 @@ export default function TransactionForm({
   const validInstallment =
     Number.isInteger(months) && months >= 2 && months <= 60 &&
     Number.isInteger(remaining) && remaining >= 1 && remaining <= months
+  const firstInstallment = validInstallment ? months - remaining + 1 : 1
+  // With installments already paid, the date field is the current installment's date.
+  const resumesInstallment = isInstallment && firstInstallment > 1
+  const purchaseDate = resumesInstallment && date ? installmentPurchaseDate(date, firstInstallment) : date
   const schedule =
     isInstallment && validInstallment && selectedCard && date && Number(amount) > 0
       ? installmentSchedule({
-          purchaseDate: date,
+          purchaseDate,
           totalMonths: months,
-          firstInstallment: months - remaining + 1,
+          firstInstallment,
           amountMode,
           amount,
           debitDay: selectedCard.debit_day,
@@ -133,9 +137,9 @@ export default function TransactionForm({
           category_id: categoryId || null,
           cash_asset_id: cashAssetId || null,
           name: memo.trim() || `${category?.name || '카드'} 할부`,
-          purchase_date: date,
+          purchase_date: purchaseDate,
           total_months: months,
-          first_installment: months - remaining + 1,
+          first_installment: firstInstallment,
           amount_mode: amountMode,
           amount: numAmount,
         })
@@ -162,6 +166,29 @@ export default function TransactionForm({
       setBusy(false)
     }
   }
+
+  // In installment mode it comes after the installment fields, whose answers decide its meaning.
+  const dateField = (
+    <div className="field">
+      <label htmlFor="transaction-date">
+        {!isInstallment ? '날짜'
+          : resumesInstallment ? `이번 회차(${firstInstallment}회차) 사용일` : '구매일 (1회차 사용일)'}
+      </label>
+      <input
+        id="transaction-date"
+        type="date"
+        max={expenseOnly || initial?.family_event_occurrence_id ? todayStr() : undefined}
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        required
+      />
+      {resumesInstallment && (
+        <span className="hint-text">
+          {firstInstallment}회차 대금이 다음 달 결제일에 출금돼요. 1회차 구매일은 자동으로 계산해요.
+        </span>
+      )}
+    </div>
+  )
 
   return (
     <Modal
@@ -215,17 +242,7 @@ export default function TransactionForm({
           />
         </div>
         <div className="transaction-form-grid">
-          <div className="field">
-            <label htmlFor="transaction-date">{isInstallment ? '구매일 (1회차 사용일)' : '날짜'}</label>
-            <input
-              id="transaction-date"
-              type="date"
-              max={expenseOnly || initial?.family_event_occurrence_id ? todayStr() : undefined}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
+          {!isInstallment && dateField}
 
           <div className="field">
             <label htmlFor="transaction-category">카테고리</label>
@@ -316,7 +333,7 @@ export default function TransactionForm({
                 <label htmlFor="transaction-installment-remaining">남은 회차</label>
                 <input id="transaction-installment-remaining" type="number" min="1" max={months || 60} inputMode="numeric"
                   value={remainingMonths} required onChange={(e) => setRemainingMonths(e.target.value)} />
-                <span className="hint-text">이미 낸 회차가 있으면 남은 회차만 입력하세요.</span>
+                <span className="hint-text">이미 낸 회차가 있으면 이번 회차를 포함해 남은 회차를 입력하세요. (예: 10개월 중 9회차면 2)</span>
               </div>
               <div className="field">
                 <span className="field-label" id="transaction-installment-mode-label">금액 입력 방식</span>
@@ -327,6 +344,7 @@ export default function TransactionForm({
                     aria-pressed={amountMode === 'monthly'} onClick={() => setAmountMode('monthly')}>매달 금액</button>
                 </div>
               </div>
+              {dateField}
             </>
           )}
 
@@ -391,6 +409,7 @@ export default function TransactionForm({
                   )}
                 </ul>
                 남은 금액 합계 {formatWon(schedule.reduce((sum, row) => sum + row.amount, 0))}
+                {resumesInstallment && <> · 구매일(1회차 사용일) {purchaseDate}</>}
               </>
             ) : (
               '카드, 금액, 할부 개월 수를 입력하면 등록될 회차를 미리 보여드려요.'
