@@ -64,6 +64,17 @@ export async function updateCreditCard(id, payload) {
   if (error) throw error
 }
 
+export async function createCardNotificationToken() {
+  const { data, error } = await supabase.rpc('create_card_notification_token')
+  if (error) throw error
+  return data
+}
+
+export async function deleteCardNotificationToken(memberId) {
+  const { error } = await supabase.from('card_notification_tokens').delete().eq('member_id', memberId)
+  if (error) throw error
+}
+
 export async function addCardInstallment(payload) {
   const { error } = await supabase.from('card_installments').insert(payload)
   if (error) throw error

@@ -317,6 +317,25 @@ try {
   await page.getByText('보유 현금 항목', { exact: true }).waitFor()
   await go('/settings')
   await shot('desktop-settings')
+  // Card alert automation: link the card by its last 4 digits, then issue the phone's key.
+  const link = page.locator('.card-link-form').first()
+  await link.getByLabel('카드 번호 끝 4자리').fill('4a371')
+  assert.equal(await link.getByLabel('카드 번호 끝 4자리').inputValue(), '4371')
+  await link.getByRole('button', { name: '저장', exact: true }).click()
+  await link.getByText('결제대금이 빠져나갈 보유처를 선택해주세요').waitFor()
+  await link.getByLabel('결제대금 출금 보유처').selectOption('cash-1')
+  await link.getByRole('button', { name: '저장', exact: true }).click()
+  await link.getByText('알림 자동 등록에 연결했어요').waitFor()
+  assert.deepEqual(await page.evaluate(() => window.__calls.at(-1)), {
+    name: 'updateCreditCard', args: ['card-1', { last4: '4371', default_cash_asset_id: 'cash-1' }],
+  })
+  await page.getByRole('button', { name: '새로 만들기', exact: true }).click()
+  await page.getByRole('dialog', { name: '연결 키를 새로 만들까요?' }).getByRole('button', { name: '새로 만들기' }).click()
+  await page.locator('.setup-row code').getByText('a'.repeat(64)).waitFor()
+  await page.locator('.setup-row code').getByText('/rest/v1/rpc/record_card_notification', { exact: false }).waitFor()
+  await page.locator('.card-notification-item').getByText('확인 필요').waitFor()
+  await noOverflow('card notification settings')
+  await page.locator('.card-notification-settings').screenshot({ path: `${output}/card-notification-settings.png` })
   await page
     .locator('.credit-card-item')
     .getByRole('button', { name: '수정', exact: true })

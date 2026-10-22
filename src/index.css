@@ -1143,6 +1143,60 @@ input[type='checkbox'] {
 .settings-list-item > :first-child {
   min-width: 0;
 }
+.settings-subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 22px 0 6px;
+  font-size: 14px;
+}
+.card-link-form {
+  margin-top: 10px;
+}
+.card-link-name {
+  flex: 1 1 100%;
+}
+.card-link-message {
+  flex: 1 1 100%;
+}
+.card-notification-setup {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  margin-top: 10px;
+  border-radius: 16px;
+  background: #f5f8fd;
+}
+.setup-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.setup-row code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.setup-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.card-notification-item .tx-meta {
+  display: block;
+  margin-top: 2px;
+}
+.notification-status {
+  flex-shrink: 0;
+}
+.notification-status.cancel_unmatched,
+.notification-status.card_unmatched,
+.notification-status.unparsed,
+.notification-status.error {
+  background: #fdecec;
+  color: #c2410c;
+}
 .stock-holding-actions,
 .credit-card-actions {
   display: flex;
@@ -1907,6 +1961,12 @@ input[type='checkbox'] {
   .loan-form,
   .stock-form {
     padding: 16px;
+  }
+  .setup-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .setup-label {
+    grid-column: 1 / -1;
   }
   .credit-card-form .btn,
   .savings-form .btn,

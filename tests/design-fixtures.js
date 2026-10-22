@@ -131,6 +131,18 @@ export function fixture(name, args) {
   if (name === 'useFamilyEvents') return { ...base, events: [] }
   if (name === 'useProfiles') return { ...base, members }
   if (name === 'useCreditCards') return { ...base, cards: empty ? [] : cards }
+  if (name === 'useCardNotifications')
+    return {
+      ...base,
+      token: empty ? null : { created_at: `${date}T07:00:00`, last_used_at: `${date}T07:05:00` },
+      notifications: empty ? [] : [
+        { id: 'n1', kind: 'approval', status: 'recorded', merchant: '삼미상사(주)미광', amount: 78000,
+          installment_months: 1, approved_at: `${date}T07:04:00`, card_id: 'card-1', card_last4: '4371', raw_text: '' },
+        { id: 'n2', kind: 'cancel', status: 'cancel_unmatched', merchant: '편의점', amount: 5000, installment_months: 1,
+          approved_at: `${date}T06:00:00`, card_id: 'card-1', card_last4: '4371', raw_text: '',
+          message: '자동 등록된 승인 내역을 찾지 못했어요. 내역에서 직접 확인해주세요' },
+      ],
+    }
   if (name === 'useCardInstallments')
     return { ...base, installments: empty ? [] : installments }
   if (name === 'useBudgets')
@@ -232,5 +244,6 @@ export async function call(name, args) {
     throw new Error('테스트: 저장에 실패했어요. 다시 시도해주세요.')
   if (window.__slowSave)
     await new Promise((resolve) => setTimeout(resolve, 500))
+  if (name === 'createCardNotificationToken') return 'a'.repeat(64)
   return {}
 }

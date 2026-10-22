@@ -1,5 +1,6 @@
 import { useUI } from '../context/UIContext'
 import Icon from '../components/Icon'
+import CardNotificationSettings from '../components/CardNotificationSettings'
 import { useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../hooks/useCategories'
@@ -473,6 +474,8 @@ export default function Settings() {
             </div>
           )}
         </div>
+
+        <CardNotificationSettings family={family} profile={profile} cards={cards} onCardsChanged={refreshCards} />
 
         <div className="card settings-wide">
           <div className="section-title">카테고리 관리</div>
