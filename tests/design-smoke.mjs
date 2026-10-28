@@ -226,6 +226,14 @@ try {
   await page.getByRole('button', { name: '기록하기', exact: true }).click()
   await page.locator('dialog').waitFor({ state: 'detached' })
   assert.equal(await page.evaluate(() => window.__calls.at(-1).args[0].type), 'income')
+  // The month's spending card explains its total.
+  await page.getByRole('button', { name: /이번 달 지출/ }).click()
+  const breakdown = page.getByRole('dialog', { name: /지출 내역/ })
+  await breakdown.getByText('어디서 나갔나요').waitFor()
+  await breakdown.getByText('신용카드 사용', { exact: false }).first().waitFor()
+  await noOverflow('expense breakdown')
+  await shot('desktop-expense-breakdown')
+  await close()
   await page.getByLabel('조회할 구성원').selectOption('member-2')
   await page
     .getByText('선택한 구성원의 지출이에요.')

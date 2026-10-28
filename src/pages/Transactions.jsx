@@ -393,12 +393,13 @@ export default function Transactions() {
                           {t.categories?.icon || '💸'}
                         </div>
                         <div className="tx-info">
+                          {/* The memo names the entry, as in the home recent list. */}
                           <div className="tx-category">
-                            {t.categories?.name || '미분류'}
+                            {t.memo || t.categories?.name || '미분류'}
                           </div>
                           <div className="tx-memo">
                             {groupBy === 'card' && `${t.date} · `}
-                            {t.memo || t.payment_method}
+                            {t.memo ? t.categories?.name || '미분류' : t.payment_method}
                             {(t.savings_plan_id || t.loan_id) &&
                               (t.date > todayStr()
                                 ? ' · 납입 예정'

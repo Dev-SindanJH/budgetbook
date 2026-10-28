@@ -153,6 +153,9 @@ try {
     .click()
   assert.equal(await page.getByLabel('금액 (원)').inputValue(), '300,000')
   await page.getByLabel('금액 (원)').fill('200000')
+  // Starts on the writer's representative card; this gift was a bank transfer.
+  assert.equal(await page.getByLabel('결제수단', { exact: true }).inputValue(), '신용카드')
+  await page.getByLabel('결제수단', { exact: true }).selectOption('계좌이체')
   await page.getByLabel('출금할 보유처').selectOption('cash-1')
   await page.getByRole('button', { name: '기록하기', exact: true }).click()
   await page.getByRole('heading', { name: '연결된 실제 지출 1건' }).waitFor()

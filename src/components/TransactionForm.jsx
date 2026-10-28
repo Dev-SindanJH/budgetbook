@@ -273,6 +273,17 @@ export default function TransactionForm({
           />
         </div>
         <div className="transaction-form-grid">
+          <div className="field transaction-memo-field">
+            <label htmlFor="transaction-memo">{isInstallment ? '할부 항목명' : '메모'}</label>
+            <input
+              id="transaction-memo"
+              value={memo}
+              maxLength={isInstallment ? 80 : undefined}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder={isInstallment ? '예: 냉장고 (비우면 카테고리 이름)' : '선택 사항'}
+            />
+          </div>
+
           {!isInstallment && dateField}
 
           <div className="field">
@@ -292,152 +303,149 @@ export default function TransactionForm({
               ))}
             </select>
           </div>
+        </div>
 
-          <div className="field">
-            <label htmlFor="transaction-payment">결제수단</label>
-            <select
-              id="transaction-payment"
-              value={paymentMethod}
-              onChange={(e) => {
-                touched.current.payment = true
-                setPaymentMethod(e.target.value)
-                if (e.target.value !== '신용카드') return
-                const card = selectedCard || defaultCard
-                if (!card) return
-                setCardId(card.id)
-                if (!touched.current.asset && card.default_cash_asset_id) {
-                  setCashAssetId(card.default_cash_asset_id)
-                }
-              }}
-            >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {type === 'expense' && paymentMethod === '신용카드' && (
+        {/* Usually prefilled from the writer's representative card. */}
+        <section className="transaction-form-sub" aria-labelledby="transaction-sub-title">
+          <h3 className="transaction-form-sub-title" id="transaction-sub-title">
+            {type === 'income' ? '입금 정보' : '결제 정보'}
+          </h3>
+          <div className="transaction-form-grid">
             <div className="field">
-              <label htmlFor="transaction-card">사용한 신용카드</label>
+              <label htmlFor="transaction-payment">결제수단</label>
               <select
-                id="transaction-card"
-                value={cardId}
+                id="transaction-payment"
+                value={paymentMethod}
                 onChange={(e) => {
-                  touched.current.card = true
-                  // A different card is usually paid from its own account.
-                  pickCard(e.target.value)
+                  touched.current.payment = true
+                  setPaymentMethod(e.target.value)
+                  if (e.target.value !== '신용카드') return
+                  const card = selectedCard || defaultCard
+                  if (!card) return
+                  setCardId(card.id)
+                  if (!touched.current.asset && card.default_cash_asset_id) {
+                    setCashAssetId(card.default_cash_asset_id)
+                  }
                 }}
-                required
               >
-                <option value="">카드를 선택하세요</option>
-                {availableCards.map((card) => (
-                  <option key={card.id} value={card.id}>
-                    {card.nickname} · {ownerName(card)}
-                    {card.active ? '' : ' (사용 중지)'}
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
                   </option>
                 ))}
               </select>
-              {availableCards.length === 0 && (
-                <span className="hint-text">
-                  등록된 카드가 없어요.{' '}
-                  <Link to="/settings" onClick={onClose}>
-                    설정에서 카드 등록하기
-                  </Link>
-                </span>
-              )}
             </div>
-          )}
 
-          {canInstall && (
-            <div className="field">
-              <span className="field-label" id="transaction-installment-label">결제 방식</span>
-              <div className="toggle-group" role="group" aria-labelledby="transaction-installment-label">
-                <button type="button" className={'toggle-option' + (!installment ? ' active' : '')}
-                  aria-pressed={!installment} onClick={() => setInstallment(false)}>일시불</button>
-                <button type="button" className={'toggle-option' + (installment ? ' active' : '')}
-                  aria-pressed={installment} onClick={() => setInstallment(true)}>할부</button>
-              </div>
-            </div>
-          )}
-
-          {isInstallment && (
-            <>
+            {type === 'expense' && paymentMethod === '신용카드' && (
               <div className="field">
-                <label htmlFor="transaction-installment-months">할부 개월 수</label>
-                <input id="transaction-installment-months" type="number" min="2" max="60" inputMode="numeric"
-                  value={totalMonths} required
+                <label htmlFor="transaction-card">사용한 신용카드</label>
+                <select
+                  id="transaction-card"
+                  value={cardId}
                   onChange={(e) => {
-                    // Keep "remaining" in step while the user hasn't said some are already paid.
-                    if (remainingMonths === totalMonths) setRemainingMonths(e.target.value)
-                    setTotalMonths(e.target.value)
-                  }} />
+                    touched.current.card = true
+                    // A different card is usually paid from its own account.
+                    pickCard(e.target.value)
+                  }}
+                  required
+                >
+                  <option value="">카드를 선택하세요</option>
+                  {availableCards.map((card) => (
+                    <option key={card.id} value={card.id}>
+                      {card.nickname} · {ownerName(card)}
+                      {card.active ? '' : ' (사용 중지)'}
+                    </option>
+                  ))}
+                </select>
+                {availableCards.length === 0 && (
+                  <span className="hint-text">
+                    등록된 카드가 없어요.{' '}
+                    <Link to="/settings" onClick={onClose}>
+                      설정에서 카드 등록하기
+                    </Link>
+                  </span>
+                )}
               </div>
+            )}
+
+            {canInstall && (
               <div className="field">
-                <label htmlFor="transaction-installment-remaining">남은 회차</label>
-                <input id="transaction-installment-remaining" type="number" min="1" max={months || 60} inputMode="numeric"
-                  value={remainingMonths} required onChange={(e) => setRemainingMonths(e.target.value)} />
-                <span className="hint-text">이미 낸 회차가 있으면 이번 회차를 포함해 남은 회차를 입력하세요. (예: 10개월 중 9회차면 2)</span>
-              </div>
-              <div className="field">
-                <span className="field-label" id="transaction-installment-mode-label">금액 입력 방식</span>
-                <div className="toggle-group" role="group" aria-labelledby="transaction-installment-mode-label">
-                  <button type="button" className={'toggle-option' + (amountMode === 'total' ? ' active' : '')}
-                    aria-pressed={amountMode === 'total'} onClick={() => setAmountMode('total')}>전체 금액</button>
-                  <button type="button" className={'toggle-option' + (amountMode === 'monthly' ? ' active' : '')}
-                    aria-pressed={amountMode === 'monthly'} onClick={() => setAmountMode('monthly')}>매달 금액</button>
+                <span className="field-label" id="transaction-installment-label">결제 방식</span>
+                <div className="toggle-group" role="group" aria-labelledby="transaction-installment-label">
+                  <button type="button" className={'toggle-option' + (!installment ? ' active' : '')}
+                    aria-pressed={!installment} onClick={() => setInstallment(false)}>일시불</button>
+                  <button type="button" className={'toggle-option' + (installment ? ' active' : '')}
+                    aria-pressed={installment} onClick={() => setInstallment(true)}>할부</button>
                 </div>
               </div>
-              {dateField}
-            </>
-          )}
-
-          <div className="field">
-            <label htmlFor="transaction-cash-asset">
-              {type === 'income' ? '입금할 보유처' : paymentMethod === '신용카드' ? '카드 결제대금 출금 보유처' : '출금할 보유처'}
-            </label>
-            <select id="transaction-cash-asset" value={cashAssetId}
-              onChange={(e) => {
-                touched.current.asset = true
-                setCashAssetId(e.target.value)
-              }} required={affectsCash}>
-              <option value="">보유처를 선택하세요</option>
-              {cashAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
-            </select>
-            {!cashAssets.length && <span className="hint-text"><Link to="/budget?tab=cash" onClick={onClose}>자산에서 현금 보유처 등록하기</Link></span>}
-            {isCardExpense && selectedCard && !selectedCard.default_cash_asset_id && cashAssets.length > 0 && (
-              <span className="hint-text">설정에서 이 카드의 출금 보유처를 정해두면 다음부터 자동으로 골라요.</span>
             )}
-            {!affectsCash && <span className="hint-text">기존 잔액에 포함된 내역이에요. 수정하거나 삭제해도 현금 잔액을 다시 계산하지 않아요.</span>}
-          </div>
 
-          <div className="field">
-            <label htmlFor="transaction-member">작성자</label>
-            <select
-              id="transaction-member"
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-            >
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
+            {isInstallment && (
+              <>
+                <div className="field">
+                  <label htmlFor="transaction-installment-months">할부 개월 수</label>
+                  <input id="transaction-installment-months" type="number" min="2" max="60" inputMode="numeric"
+                    value={totalMonths} required
+                    onChange={(e) => {
+                      // Keep "remaining" in step while the user hasn't said some are already paid.
+                      if (remainingMonths === totalMonths) setRemainingMonths(e.target.value)
+                      setTotalMonths(e.target.value)
+                    }} />
+                </div>
+                <div className="field">
+                  <label htmlFor="transaction-installment-remaining">남은 회차</label>
+                  <input id="transaction-installment-remaining" type="number" min="1" max={months || 60} inputMode="numeric"
+                    value={remainingMonths} required onChange={(e) => setRemainingMonths(e.target.value)} />
+                  <span className="hint-text">이미 낸 회차가 있으면 이번 회차를 포함해 남은 회차를 입력하세요. (예: 10개월 중 9회차면 2)</span>
+                </div>
+                <div className="field">
+                  <span className="field-label" id="transaction-installment-mode-label">금액 입력 방식</span>
+                  <div className="toggle-group" role="group" aria-labelledby="transaction-installment-mode-label">
+                    <button type="button" className={'toggle-option' + (amountMode === 'total' ? ' active' : '')}
+                      aria-pressed={amountMode === 'total'} onClick={() => setAmountMode('total')}>전체 금액</button>
+                    <button type="button" className={'toggle-option' + (amountMode === 'monthly' ? ' active' : '')}
+                      aria-pressed={amountMode === 'monthly'} onClick={() => setAmountMode('monthly')}>매달 금액</button>
+                  </div>
+                </div>
+                {dateField}
+              </>
+            )}
 
-          <div className="field">
-            <label htmlFor="transaction-memo">{isInstallment ? '할부 항목명' : '메모'}</label>
-            <input
-              id="transaction-memo"
-              value={memo}
-              maxLength={isInstallment ? 80 : undefined}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder={isInstallment ? '예: 냉장고 (비우면 카테고리 이름)' : '선택 사항'}
-            />
+            <div className="field">
+              <label htmlFor="transaction-cash-asset">
+                {type === 'income' ? '입금할 보유처' : paymentMethod === '신용카드' ? '카드 결제대금 출금 보유처' : '출금할 보유처'}
+              </label>
+              <select id="transaction-cash-asset" value={cashAssetId}
+                onChange={(e) => {
+                  touched.current.asset = true
+                  setCashAssetId(e.target.value)
+                }} required={affectsCash}>
+                <option value="">보유처를 선택하세요</option>
+                {cashAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+              </select>
+              {!cashAssets.length && <span className="hint-text"><Link to="/budget?tab=cash" onClick={onClose}>자산에서 현금 보유처 등록하기</Link></span>}
+              {isCardExpense && selectedCard && !selectedCard.default_cash_asset_id && cashAssets.length > 0 && (
+                <span className="hint-text">설정에서 이 카드의 출금 보유처를 정해두면 다음부터 자동으로 골라요.</span>
+              )}
+              {!affectsCash && <span className="hint-text">기존 잔액에 포함된 내역이에요. 수정하거나 삭제해도 현금 잔액을 다시 계산하지 않아요.</span>}
+            </div>
+
+            <div className="field">
+              <label htmlFor="transaction-member">작성자</label>
+              <select
+                id="transaction-member"
+                value={memberId}
+                onChange={(e) => setMemberId(e.target.value)}
+              >
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        </section>
 
         {isInstallment ? (
           <div className="payment-explainer installment-preview">

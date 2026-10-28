@@ -106,9 +106,9 @@ export default function DashboardCalendar({ month, transactions, events = [], on
                   </div>
                   <div className="tx-info">
                     <div className="tx-category">
-                      {t.categories?.name || '미분류'}
+                      {t.memo || t.categories?.name || '미분류'}
                     </div>
-                    {t.memo && <div className="tx-memo">{t.memo}</div>}
+                    {t.memo && <div className="tx-memo">{t.categories?.name || '미분류'}</div>}
                     <div className="tx-meta">{t.profiles?.name}</div>
                   </div>
                 </div>

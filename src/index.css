@@ -669,6 +669,110 @@ input[type='checkbox'] {
 .hero-amount.over {
   color: var(--danger);
 }
+.hero-card-clickable {
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.hero-card-clickable:hover {
+  box-shadow:
+    0 18px 50px #345aa31c,
+    inset 0 1px 0 white;
+}
+.hero-actions {
+  cursor: default;
+}
+.hero-breakdown-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hero-breakdown-button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.hero-breakdown-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 6px;
+  border-radius: 12px;
+}
+.hero-breakdown-button .hero-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hero-breakdown-button .hero-amount {
+  display: block;
+}
+.breakdown-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.breakdown-total > span {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.breakdown-total > strong {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.breakdown-section {
+  padding: 6px 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+.breakdown-section h3 {
+  margin: 12px 0 4px;
+  font-size: 14px;
+}
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.breakdown-row > span {
+  min-width: 0;
+  flex: 1;
+}
+.breakdown-row small {
+  display: block;
+  color: var(--text-muted);
+}
+.breakdown-row > strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.breakdown-sub {
+  padding: 4px 0 4px 14px;
+  color: var(--text-muted);
+}
+.breakdown-bar {
+  display: block;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: #e9eef7;
+  overflow: hidden;
+}
+.breakdown-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.expense-breakdown-modal .btn-block {
+  margin-top: 18px;
+}
 .hero-description {
   font-size: 13px;
   color: var(--text-muted);
@@ -1592,6 +1696,21 @@ input[type='checkbox'] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 16px;
+}
+.transaction-memo-field {
+  grid-column: 1 / -1;
+}
+.transaction-form-sub {
+  margin-top: 6px;
+  padding: 16px 16px 2px;
+  border-radius: 16px;
+  background: #f1f5fc;
+}
+.transaction-form-sub-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 .amount-field {
   margin: 20px 0 26px;

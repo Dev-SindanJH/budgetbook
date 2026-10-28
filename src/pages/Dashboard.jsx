@@ -30,6 +30,7 @@ import CategoryDonutChart from '../components/CategoryDonutChart'
 import FamilyEvents from '../components/FamilyEvents'
 import ColoringGrid from '../components/ColoringGrid'
 import TransactionForm from '../components/TransactionForm'
+import ExpenseBreakdown from '../components/ExpenseBreakdown'
 import Modal from '../components/Modal'
 import Icon from '../components/Icon'
 
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const [member, setMember] = useState('all')
   const [formType, setFormType] = useState(null)
   const [showDue, setShowDue] = useState(false)
+  const [showExpense, setShowExpense] = useState(false)
   const { from, to } = monthRange(month)
   const {
     transactions: allTransactions,
@@ -83,6 +85,8 @@ export default function Dashboard() {
     .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + Number(t.amount), 0)
   const ready = !loading
+  const memberLabel =
+    member === 'all' ? '가족 전체' : members.find((m) => m.id === member)?.name
   const { plans, loading: plansLoading, error: plansError } = useSavingsPlans(family?.id)
   const cashValue = cashAssetBalances(cashAssets, allTransactions, today).reduce((sum, asset) => sum + asset.balance, 0)
   const savingsValue = totalSavingsPaid(plans, today)
@@ -222,20 +226,27 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="home-grid">
-        <section className="hero-card">
+        <section
+          className="hero-card hero-card-clickable"
+          // The whole card opens the breakdown; its own buttons keep their actions.
+          onClick={(e) => {
+            if (ready && !e.target.closest('.hero-actions')) setShowExpense(true)
+          }}
+        >
           <div className="hero-heading">
             <span className="eyebrow">MONTHLY SPENDING</span>
-            <span className="soft-badge">
-              {member === 'all'
-                ? '가족 전체'
-                : members.find((m) => m.id === member)?.name}
+            <span className="soft-badge">{memberLabel}</span>
+          </div>
+          <button type="button" className="hero-breakdown-button" disabled={!ready}>
+            <span className="hero-label">
+              이번 달 지출
+              <Icon name="right" size={16} />
             </span>
-          </div>
-          <div className="hero-label">이번 달 지출</div>
-          <div className={`hero-amount${expense >= 10000000000 ? ' amount-long' : ''}`}>
-            {ready ? <Money amount={expense} /> : '확인 중…'}
-          </div>
-          <p className="hero-description">{!ready ? '이번 달 기록을 정리하고 있어요.' : member !== 'all' ? '선택한 구성원의 지출이에요.' : '이번 달 우리 집의 지출을 확인해보세요.'}</p>
+            <span className={`hero-amount${expense >= 10000000000 ? ' amount-long' : ''}`}>
+              {ready ? <Money amount={expense} /> : '확인 중…'}
+            </span>
+          </button>
+          <p className="hero-description">{!ready ? '이번 달 기록을 정리하고 있어요.' : member !== 'all' ? '선택한 구성원의 지출이에요. 눌러서 자세히 확인해보세요.' : '눌러서 어디에 얼마나 썼는지 확인해보세요.'}</p>
           <div className="hero-actions">
             <button
               className="btn btn-primary"
@@ -528,6 +539,17 @@ export default function Dashboard() {
             카드 내역 확인
           </Link>
         </Modal>
+      )}
+      {showExpense && (
+        <ExpenseBreakdown
+          month={month}
+          memberLabel={memberLabel}
+          expenses={expenseTransactions}
+          cards={cards}
+          members={members}
+          showMembers={member === 'all'}
+          onClose={() => setShowExpense(false)}
+        />
       )}
       {formType && (
         <TransactionForm
