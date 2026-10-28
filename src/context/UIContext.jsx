@@ -50,19 +50,38 @@ function PromptDialog({ options, onResolve }) {
         {(options.fields || []).map((field, index) => (
           <div className="field" key={field.name}>
             <label htmlFor={`prompt-${field.name}`}>{field.label}</label>
-            <input
-              id={`prompt-${field.name}`}
-              type={field.type || 'text'}
-              required={field.required !== false}
-              min={field.min}
-              max={field.max}
-              maxLength={field.maxLength}
-              data-autofocus={index === 0 ? '' : undefined}
-              value={values[field.name]}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, [field.name]: e.target.value }))
-              }
-            />
+            {field.type === 'select' ? (
+              <select
+                id={`prompt-${field.name}`}
+                required={field.required !== false}
+                data-autofocus={index === 0 ? '' : undefined}
+                value={values[field.name]}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, [field.name]: e.target.value }))
+                }
+              >
+                {field.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={`prompt-${field.name}`}
+                type={field.type || 'text'}
+                required={field.required !== false}
+                min={field.min}
+                max={field.max}
+                maxLength={field.maxLength}
+                data-autofocus={index === 0 ? '' : undefined}
+                value={values[field.name]}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, [field.name]: e.target.value }))
+                }
+              />
+            )}
+            {field.hint && <span className="hint-text">{field.hint}</span>}
           </div>
         ))}
         {error && (

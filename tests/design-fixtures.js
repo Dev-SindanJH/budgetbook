@@ -5,7 +5,7 @@ const date = `${month}-${String(today.getDate()).padStart(2, '0')}`
 const next = new Date(today.getFullYear(), today.getMonth() + 1, 15)
 const nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-15`
 export const members = [
-  { id: 'member-1', family_id: 'family-1', name: '지민', color: '#6485e5' },
+  { id: 'member-1', family_id: 'family-1', name: '지민', color: '#6485e5', default_card_id: 'card-1' },
   { id: 'member-2', family_id: 'family-1', name: '서준', color: '#9c84d3' },
 ]
 export const categories = [
@@ -19,6 +19,7 @@ export const cards = [
     owner_id: 'member-1',
     nickname: '우리 집 생활비',
     debit_day: 15,
+    default_cash_asset_id: 'cash-1',
     active: true,
   },
   {

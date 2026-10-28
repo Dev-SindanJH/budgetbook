@@ -154,6 +154,15 @@ try {
   await moneyInput.fill('18000')
   assert.equal(await moneyInput.inputValue(), '18,000')
   await page.getByText('1만 8000원', { exact: true }).waitFor()
+  // The writer's representative card and its payment account are preselected.
+  assert.equal(await page.getByLabel('결제수단', { exact: true }).inputValue(), '신용카드')
+  assert.equal(await page.getByLabel('사용한 신용카드').inputValue(), 'card-1')
+  assert.equal(await page.getByLabel('카드 결제대금 출금 보유처').inputValue(), 'cash-1')
+  // Another writer has no representative card, so the selection stays.
+  await page.getByLabel('작성자').selectOption('member-2')
+  assert.equal(await page.getByLabel('사용한 신용카드').inputValue(), 'card-1')
+  await page.getByLabel('작성자').selectOption('member-1')
+  await page.getByLabel('결제수단', { exact: true }).selectOption('현금')
   await page.getByLabel('결제수단', { exact: true }).selectOption('신용카드')
   await page.getByLabel('사용한 신용카드').selectOption('card-1')
   await page.getByLabel('카드 결제대금 출금 보유처').selectOption('cash-1')
@@ -318,10 +327,19 @@ try {
   await page.getByText('보유 현금 항목', { exact: true }).waitFor()
   await go('/settings')
   await shot('desktop-settings')
+  // The representative card can be any active family card and is saved on the profile.
+  assert.equal(await page.getByLabel('내 결제 대표카드').inputValue(), 'card-1')
+  await page.getByLabel('내 결제 대표카드').selectOption('card-2')
+  await page.getByText('대표카드를 정했어요').waitFor()
+  assert.deepEqual(await page.evaluate(() => window.__calls.at(-1)), {
+    name: 'updateOwnProfile', args: ['member-1', { default_card_id: 'card-2' }],
+  })
   // Card alert automation: link the card by its last 4 digits, then issue the phone's key.
   const link = page.locator('.card-link-form').first()
   await link.getByLabel('카드 번호 끝 4자리').fill('4a371')
   assert.equal(await link.getByLabel('카드 번호 끝 4자리').inputValue(), '4371')
+  assert.equal(await link.getByLabel('결제대금 출금 보유처').inputValue(), 'cash-1')
+  await link.getByLabel('결제대금 출금 보유처').selectOption('')
   await link.getByRole('button', { name: '저장', exact: true }).click()
   await link.getByText('결제대금이 빠져나갈 보유처를 선택해주세요').waitFor()
   await link.getByLabel('결제대금 출금 보유처').selectOption('cash-1')
@@ -342,6 +360,7 @@ try {
     .getByRole('button', { name: '수정', exact: true })
     .click()
   await page.getByRole('dialog', { name: '신용카드 수정' }).waitFor()
+  assert.equal(await page.locator('dialog').getByLabel('결제대금 출금 보유처').inputValue(), 'cash-1')
   await page
     .getByLabel('카드 별명', { exact: true })
     .last()

@@ -1,5 +1,5 @@
 import MoneyInput from './MoneyInput'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { todayStr, monthLabel } from '../utils/format'
 import { creditCardDueDate, installmentPurchaseDate, installmentSchedule } from '../utils/creditCards'
 import { formatWon } from '../utils/format'
@@ -54,6 +54,18 @@ export default function TransactionForm({
   const ownerName = (card) =>
     members.find((m) => m.id === card.owner_id)?.name || '가족'
   const selectedCard = availableCards.find((c) => c.id === cardId)
+  // The writer's representative card, with its usual payment account.
+  const defaultCard = cards.find(
+    (c) => c.active && c.id === members.find((m) => m.id === memberId)?.default_card_id,
+  )
+  // Defaults never overwrite what the user picked themselves.
+  const touched = useRef({ payment: false, card: false, asset: false })
+
+  function pickCard(id) {
+    setCardId(id)
+    const asset = cards.find((c) => c.id === id)?.default_cash_asset_id
+    if (asset) setCashAssetId(asset)
+  }
   const isCardExpense = type === 'expense' && paymentMethod === '신용카드'
   const canInstall = Boolean(onSubmitInstallment) && !initial && isCardExpense
   const isInstallment = canInstall && installment
@@ -92,6 +104,25 @@ export default function TransactionForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, categories])
+
+  // New expenses start on the writer's representative card. Members and cards may
+  // arrive after the form opens, and changing the writer switches to their card.
+  useEffect(() => {
+    if (initial || !defaultCard) return
+    const { payment, card, asset } = touched.current
+    if (type !== 'expense') {
+      // Income goes to whatever account it arrives in, not the card's account.
+      if (!payment) setPaymentMethod(PAYMENT_METHODS[0])
+      if (!asset) setCashAssetId('')
+      return
+    }
+    if (!payment) setPaymentMethod('신용카드')
+    if (!card) setCardId(defaultCard.id)
+    if (!asset && defaultCard.default_cash_asset_id) {
+      setCashAssetId(defaultCard.default_cash_asset_id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultCard?.id, type])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -267,7 +298,17 @@ export default function TransactionForm({
             <select
               id="transaction-payment"
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
+              onChange={(e) => {
+                touched.current.payment = true
+                setPaymentMethod(e.target.value)
+                if (e.target.value !== '신용카드') return
+                const card = selectedCard || defaultCard
+                if (!card) return
+                setCardId(card.id)
+                if (!touched.current.asset && card.default_cash_asset_id) {
+                  setCashAssetId(card.default_cash_asset_id)
+                }
+              }}
             >
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
@@ -283,7 +324,11 @@ export default function TransactionForm({
               <select
                 id="transaction-card"
                 value={cardId}
-                onChange={(e) => setCardId(e.target.value)}
+                onChange={(e) => {
+                  touched.current.card = true
+                  // A different card is usually paid from its own account.
+                  pickCard(e.target.value)
+                }}
                 required
               >
                 <option value="">카드를 선택하세요</option>
@@ -353,11 +398,17 @@ export default function TransactionForm({
               {type === 'income' ? '입금할 보유처' : paymentMethod === '신용카드' ? '카드 결제대금 출금 보유처' : '출금할 보유처'}
             </label>
             <select id="transaction-cash-asset" value={cashAssetId}
-              onChange={(e) => setCashAssetId(e.target.value)} required={affectsCash}>
+              onChange={(e) => {
+                touched.current.asset = true
+                setCashAssetId(e.target.value)
+              }} required={affectsCash}>
               <option value="">보유처를 선택하세요</option>
               {cashAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
             </select>
             {!cashAssets.length && <span className="hint-text"><Link to="/budget?tab=cash" onClick={onClose}>자산에서 현금 보유처 등록하기</Link></span>}
+            {isCardExpense && selectedCard && !selectedCard.default_cash_asset_id && cashAssets.length > 0 && (
+              <span className="hint-text">설정에서 이 카드의 출금 보유처를 정해두면 다음부터 자동으로 골라요.</span>
+            )}
             {!affectsCash && <span className="hint-text">기존 잔액에 포함된 내역이에요. 수정하거나 삭제해도 현금 잔액을 다시 계산하지 않아요.</span>}
           </div>
 

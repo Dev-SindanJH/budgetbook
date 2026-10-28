@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../hooks/useCategories'
 import { useProfiles } from '../hooks/useProfiles'
 import { useCreditCards } from '../hooks/useCreditCards'
+import { useCashAssets } from '../hooks/useCashAssets'
 import {
   addCategory,
   updateCategory,
@@ -48,9 +49,16 @@ export default function Settings() {
     error: cardsError,
     refresh: refreshCards,
   } = useCreditCards(family?.id)
+  const { assets: cashAssets } = useCashAssets(family?.id)
   const myCards = cards.filter((card) => card.owner_id === profile?.id)
+  const activeCards = cards.filter((card) => card.active)
+  const assetName = (id) => cashAssets.find((asset) => asset.id === id)?.name
+  const ownerName = (card) =>
+    members.find((m) => m.id === card.owner_id)?.name || '가족'
   const [cardNickname, setCardNickname] = useState('')
   const [cardDebitDay, setCardDebitDay] = useState('15')
+  const [cardAssetId, setCardAssetId] = useState('')
+  const [savingDefaultCard, setSavingDefaultCard] = useState(false)
   const [savingCard, setSavingCard] = useState(false)
   const [cardMessage, setCardMessage] = useState('')
 
@@ -149,8 +157,10 @@ export default function Settings() {
         owner_id: profile.id,
         nickname: cardNickname.trim(),
         debit_day: day,
+        default_cash_asset_id: cardAssetId || null,
       })
       setCardNickname('')
+      setCardAssetId('')
       await refreshCards()
       setCardMessage('신용카드를 등록했어요')
     } catch (err) {
@@ -180,6 +190,18 @@ export default function Settings() {
           max: 31,
           value: String(card.debit_day),
         },
+        {
+          name: 'cashAssetId',
+          label: '결제대금 출금 보유처',
+          type: 'select',
+          required: false,
+          value: card.default_cash_asset_id || '',
+          options: [
+            { value: '', label: '정하지 않음' },
+            ...cashAssets.map((asset) => ({ value: asset.id, label: asset.name })),
+          ],
+          hint: '이 카드로 지출을 기록할 때 출금 보유처로 미리 골라둬요.',
+        },
       ],
       validate: (v) =>
         !v.nickname.trim() ||
@@ -187,11 +209,14 @@ export default function Settings() {
         Number(v.debitDay) < 1 ||
         Number(v.debitDay) > 31
           ? '카드 별명과 1~31일 사이의 자동이체일을 입력해주세요'
-          : '',
+          : card.last4 && !v.cashAssetId
+            ? '알림 자동 등록에 연결된 카드는 출금 보유처가 필요해요'
+            : '',
       onSubmit: async (v) => {
         await updateCreditCard(card.id, {
           nickname: v.nickname.trim(),
           debit_day: Number(v.debitDay),
+          default_cash_asset_id: v.cashAssetId || null,
         })
         await refreshCards()
       },
@@ -199,6 +224,19 @@ export default function Settings() {
     if (values) {
       setCardMessage('변경한 자동이체일은 앞으로 입력하는 지출부터 적용돼요')
       notify('카드 정보를 수정했어요')
+    }
+  }
+
+  async function handleDefaultCardChange(cardId) {
+    setSavingDefaultCard(true)
+    try {
+      await updateOwnProfile(profile.id, { default_card_id: cardId || null })
+      await Promise.all([refreshProfile(), refreshMembers()])
+      notify(cardId ? '대표카드를 정했어요' : '대표카드를 해제했어요')
+    } catch (err) {
+      notify(err.message || '대표카드를 저장하지 못했어요', true)
+    } finally {
+      setSavingDefaultCard(false)
     }
   }
 
@@ -407,6 +445,25 @@ export default function Settings() {
               카드 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.
             </div>
           )}
+          <div className="field default-card-field">
+            <label htmlFor="default-card">내 결제 대표카드</label>
+            <select
+              id="default-card"
+              value={activeCards.some((c) => c.id === profile?.default_card_id) ? profile.default_card_id : ''}
+              disabled={savingDefaultCard}
+              onChange={(e) => handleDefaultCardChange(e.target.value)}
+            >
+              <option value="">정하지 않음</option>
+              {activeCards.map((card) => (
+                <option key={card.id} value={card.id}>
+                  {card.nickname} · {ownerName(card)}
+                </option>
+              ))}
+            </select>
+            <span className="hint-text">
+              지출을 기록할 때 이 카드와 카드의 출금 보유처가 미리 선택돼요. 가족 카드도 고를 수 있어요.
+            </span>
+          </div>
           {myCards.length === 0 && (
             <div className="hint-text" style={{ marginBottom: 12 }}>
               등록한 신용카드가 없어요.
@@ -415,7 +472,12 @@ export default function Settings() {
           {myCards.map((card) => (
             <div className="settings-list-item credit-card-item" key={card.id}>
               <span>
-                <strong>{card.nickname}</strong> · 매달 {card.debit_day}일
+                <strong>{card.nickname}</strong>
+                {card.active && card.id === profile?.default_card_id && (
+                  <span className="badge">대표</span>
+                )}{' '}
+                · 매달 {card.debit_day}일
+                {card.default_cash_asset_id && ` · ${assetName(card.default_cash_asset_id) || '보유처'}에서 출금`}
                 {!card.active && ' · 사용 중지'}
               </span>
               <span className="credit-card-actions">
@@ -459,6 +521,21 @@ export default function Settings() {
                 onChange={(e) => setCardDebitDay(e.target.value)}
                 required
               />
+            </div>
+            <div className="field">
+              <label htmlFor="card-cash-asset">결제대금 출금 보유처</label>
+              <select
+                id="card-cash-asset"
+                value={cardAssetId}
+                onChange={(e) => setCardAssetId(e.target.value)}
+              >
+                <option value="">정하지 않음</option>
+                {cashAssets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               className="btn btn-primary"

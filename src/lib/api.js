@@ -95,7 +95,7 @@ export async function saveCashAsset({ id, family_id, name, amount }) {
 
 export async function deleteCashAsset(id) {
   const { error } = await supabase.from('cash_assets').delete().eq('id', id)
-  if (error?.code === '23503') throw new Error('거래나 자동납입에 연결된 보유처는 삭제할 수 없어요. 연결된 보유처를 먼저 변경해주세요.')
+  if (error?.code === '23503') throw new Error('거래·자동납입·신용카드 출금에 연결된 보유처는 삭제할 수 없어요. 연결된 보유처를 먼저 변경해주세요.')
   if (error) throw error
 }
 

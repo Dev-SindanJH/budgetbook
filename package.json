@@ -11,7 +11,8 @@
     "test:calendar-db": "node tests/family-events-db.mjs",
     "test:calendar-ui": "node tests/family-calendar-smoke.mjs",
     "test:installments-db": "node tests/card-installments-db.mjs",
-    "test:notifications-db": "node tests/card-notifications-db.mjs"
+    "test:notifications-db": "node tests/card-notifications-db.mjs",
+    "test:default-card-db": "node tests/default-card-db.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

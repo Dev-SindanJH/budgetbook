@@ -1128,6 +1128,14 @@ input[type='checkbox'] {
   flex: 1 1 165px;
   margin: 0;
 }
+.default-card-field {
+  max-width: 420px;
+  margin-bottom: 16px;
+}
+.credit-card-item .badge {
+  margin-left: 6px;
+  padding: 2px 8px;
+}
 .settings-list-item {
   display: flex;
   justify-content: space-between;
