@@ -24,7 +24,6 @@ import {
 import { getDashboardPrefs } from '../lib/dashboardPrefs'
 import {
   isCreditCardExpense,
-  isImmediateExpense,
 } from '../utils/creditCards'
 import CategoryDonutChart from '../components/CategoryDonutChart'
 import FamilyEvents from '../components/FamilyEvents'
@@ -92,46 +91,27 @@ export default function Dashboard() {
   const savingsValue = totalSavingsPaid(plans, today)
   const totalAssets = cashValue + savingsValue + stockValue
   const assetsLoading = loading || cashLoading || plansLoading || stockLoading
-  const dueGroups = useMemo(() => {
-    const map = {}
-    const end = monthRange(addMonths(month, 1)).to
-    const start = month === monthStr() ? today : from
-    for (const t of allTransactions) {
-      if (
-        !isCreditCardExpense(t) ||
-        !t.card_due_date ||
-        t.card_due_date < start ||
-        t.card_due_date > end ||
-        (member !== 'all' && t.member_id !== member)
-      )
-        continue
-      const group = (map[t.card_due_date] ||= {
-        date: t.card_due_date,
+  // The card bill panel shows what was charged this month, billed next month.
+  const cardBills = expenseTransactions.filter(isCreditCardExpense)
+  const cardSpending = cardBills.reduce((s, t) => s + Number(t.amount), 0)
+  const cardGroups = Object.values(
+    cardBills.reduce((map, t) => {
+      // Loan interest paid by card has no card row; it is billed on its own date.
+      const key = t.card_id || 'loan'
+      const group = (map[key] ||= {
+        key,
+        card: cards.find((c) => c.id === t.card_id),
         amount: 0,
+        dates: new Set(),
         items: [],
       })
       group.amount += Number(t.amount)
+      if (t.card_due_date) group.dates.add(t.card_due_date)
       group.items.push(t)
-    }
-    return Object.values(map).sort((a, b) => a.date.localeCompare(b.date))
-  }, [allTransactions, month, from, member, today])
-  const cardPayments = allTransactions
-    .filter(
-      (t) =>
-        isCreditCardExpense(t) &&
-        t.card_due_date?.slice(0, 7) === month &&
-        (member === 'all' || t.member_id === member),
-    )
-    .reduce((s, t) => s + Number(t.amount), 0)
-  const cashFlow =
-    income -
-    expenseTransactions
-      .filter(isImmediateExpense)
-      .reduce((s, t) => s + Number(t.amount), 0) -
-    cardPayments
-  const legacyCards = allTransactions.filter(
-    (t) => isCreditCardExpense(t) && !t.card_due_date,
-  ).length
+      return map
+    }, {}),
+  ).sort((a, b) => b.amount - a.amount)
+  const cardMonthLabel = month === monthStr() ? '이번 달' : monthLabel(month)
   const donutData = Object.values(
     expenseTransactions.reduce((map, t) => {
       const name = t.categories?.name || '기타'
@@ -320,20 +300,19 @@ export default function Dashboard() {
                 <span className="section-icon lavender">
                   <Icon name="card" />
                 </span>
-                <strong>카드 결제 일정</strong>
+                <strong>{cardMonthLabel} 카드값</strong>
                 <Icon name="right" size={16} />
               </span>
               <span className="due-value">
                 {loading
                   ? '확인 중…'
-                  : dueGroups[0]
-                    ? <Money amount={dueGroups[0].amount} />
-                    : '예정된 결제가 없어요'}
+                  : cardGroups.length
+                    ? <Money amount={cardSpending} />
+                    : '사용한 카드값이 없어요'}
               </span>
               <span className="hint-text">
-                {dueGroups[0]
-                  ? `${dueGroups[0].date} · 등록된 내역 기준`
-                  : '카드 사용 내역을 기록하면 확인할 수 있어요.'}
+                {Number(month.slice(5))}월 사용분 · {Number(addMonths(month, 1).slice(5))}월 출금
+                {cardGroups.length > 0 && ` · 카드 ${cardGroups.length}장`}
               </span>
             </button>
           )}
@@ -488,49 +467,47 @@ export default function Dashboard() {
       )}
       {showDue && (
         <Modal
-          title="카드 결제 일정"
-          description={`${monthLabel(month)}부터 다음 달까지 · ${member === 'all' ? '가족 전체' : members.find((m) => m.id === member)?.name}`}
+          title={`${cardMonthLabel} 카드값`}
+          description={`${monthLabel(month)}에 사용해서 ${monthLabel(addMonths(month, 1))}에 출금 · ${memberLabel}`}
           onClose={() => setShowDue(false)}
         >
-          <div className="payment-explainer">
-            사용한 금액은 소비에, 결제 예정 금액은 현금 흐름에 반영해요. 소비로
-            두 번 더하지 않아요.
+          <div className="breakdown-total">
+            <span>합계</span>
+            <strong><Money amount={cardSpending} /></strong>
           </div>
-          {!dueGroups.length && (
-            <div className="empty-state">이 기간에 등록된 결제가 없어요</div>
+          <div className="payment-explainer">
+            이 달에 신용카드로 쓴 금액이에요. 카드마다 다음 달 결제일에 출금돼요.
+          </div>
+          {!cardGroups.length && (
+            <div className="empty-state">이 달에 사용한 카드값이 없어요</div>
           )}
-          {dueGroups.map((g) => (
-            <section className="due-group" key={g.date}>
-              <div className="flow-row">
-                <strong>{g.date}</strong>
+          {cardGroups.map((g) => (
+            <details className="card-bill" key={g.key}>
+              <summary>
+                <span>
+                  <strong>{g.card?.nickname || (g.key === 'loan' ? '대출이자 (카드 납입)' : '신용카드')}</strong>
+                  <small>
+                    {g.dates.size
+                      ? [...g.dates].sort().map((d) => d.slice(5).replace('-', '/')).join(', ') + ' 출금'
+                      : '출금일 미정'}{' '}
+                    · {g.items.length}건
+                  </small>
+                </span>
                 <strong><Money amount={g.amount} /></strong>
-              </div>
-              {g.items.map((t) => (
+              </summary>
+              {[...g.items].sort((a, b) => a.date.localeCompare(b.date)).map((t) => (
                 <div className="due-item" key={t.id}>
                   <span>
-                    {cards.find((c) => c.id === t.card_id)?.nickname ||
-                      '신용카드'}
+                    {t.memo || t.categories?.name || '미분류'}
                     <small>
-                      {t.memo || t.categories?.name} · {t.profiles?.name}
+                      {t.date.slice(5).replace('-', '.')} 사용 · {t.categories?.name || '미분류'} · {t.profiles?.name}
                     </small>
                   </span>
                   <strong><Money amount={t.amount} /></strong>
                 </div>
               ))}
-            </section>
+            </details>
           ))}
-          <div className="payment-explainer">
-            {monthLabel(month)} 예상 현금 흐름{' '}
-            <strong><Money amount={cashFlow} /></strong>
-            <br />
-            수입 − 즉시 지출 − 해당 월 카드 결제액. 보유 현금 잔액과는 달라요.
-          </div>
-          {legacyCards > 0 && (
-            <p className="hint-text">
-              결제일이 없는 기존 카드 내역 {legacyCards}건은 일정에서
-              제외했어요.
-            </p>
-          )}
           <Link
             className="btn btn-primary btn-block"
             to="/transactions"

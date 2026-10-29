@@ -239,7 +239,16 @@ try {
     .getByText('선택한 구성원의 지출이에요.')
     .waitFor()
   await page.getByLabel('조회할 구성원').selectOption('all')
-  await page.getByRole('button', { name: /카드 결제 일정/ }).click()
+  // The panel totals this month's card use, billed next month.
+  await page.locator('.due-card .money-number').getByText('58,000원', { exact: true }).waitFor()
+  await page.getByRole('button', { name: /카드값/ }).click()
+  const bill = page.locator('.card-bill').first()
+  await bill.getByText('우리 집 생활비', { exact: true }).waitFor()
+  // Card details start folded and open on demand.
+  assert.equal(await bill.getByText('가족과 함께한 저녁').isVisible(), false)
+  await bill.locator('summary').click()
+  await bill.getByText('가족과 함께한 저녁').waitFor()
+  await noOverflow('card bill')
   await shot('card-schedule')
   await close()
   await go('/transactions')
